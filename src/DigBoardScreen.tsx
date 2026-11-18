@@ -1,11 +1,11 @@
-import { Sparkles, Star } from "lucide-react";
+import { Check, CircleQuestionMark, PaintbrushVertical, RotateCcw, Sparkles, Star } from "lucide-react";
 import type { AgeLevel } from "./ageLevel.ts";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { Button } from "./Button.tsx";
 import type { Language } from "./language/language.ts";
 import { TEXTS } from "./language/texts.ts";
 import { useGateShown } from "./OrientationGate.tsx";
-import { BrushPicker, DigBar, FieldGuideButton } from "./DigBar.tsx";
+import { BrushButtons, BrushPicker, DigBar, DigGround, DugUpChip, FieldGuideButton } from "./DigBar.tsx";
 import { Picture, PictureImage, usePicture, type PictureLook } from "./Picture.tsx";
 import type { StartTimer } from "./ownedTimers.ts";
 
@@ -78,10 +78,15 @@ export type DigBoardScreenProps = {
   // The round asks who it is once enough of the dinosaur shows, so the
   // board stands beside the choices' column from the start.
   asks: boolean;
-  // How many dinosaurs the question offers: the column holds an empty
-  // card for each until the question comes.
+  // Whether enough of the dinosaur shows for the question, kept through
+  // the gust and lift after the right pick.
+  questionShown: boolean;
+  // How visible the choices are, from 0 to 1, as the digging shows them;
+  // their empty cards take the rest.
+  choicesShown: number;
+  // How many slots the question's column holds from the round's start.
   choiceCount: number;
-  // The dinosaurs to pick from while the round asks, else none.
+  // The round's dinosaurs, present even before the question unlocks.
   choices: readonly { id: string; name: string; picture: string; rejected: boolean; correct: boolean }[];
   // The age level the round plays.
   level: AgeLevel;
@@ -243,6 +248,8 @@ export function DigBoardScreen({
   treasure,
   treasureFlight,
   asks,
+  questionShown,
+  choicesShown,
   choiceCount,
   choices,
   level,
@@ -261,7 +268,6 @@ export function DigBoardScreen({
 }: DigBoardScreenProps) {
   const gateShown = useGateShown();
   const text = TEXTS[language];
-  const choice = choices.length > 0;
   const chipStar = useRef<SVGSVGElement>(null);
   const [flight, setFlight] = useState<CSSProperties>({});
   const book = useRef<SVGSVGElement>(null);
@@ -458,16 +464,13 @@ export function DigBoardScreen({
   return (
     <main className="dig-screen dig-board-screen" data-motion={grains || undefined}
       style={{ "--dig-drop": `${arrivalWait}ms`, "--dig-gust": `${gustWait}ms`, "--dig-lift": `${liftWait}ms`, "--dig-treasure": `${flightWait}ms` } as CSSProperties}>
-      <div className="stratum stratum-1" aria-hidden="true" />
-      <DigBar language={language} title={choice ? text.whoIsIt : text.dig} onHome={onHome}>
+      <DigGround />
+      <DigBar language={language} title={questionShown ? text.whoIsIt : text.dig} Mark={questionShown ? CircleQuestionMark : PaintbrushVertical} onHome={onHome}>
         <BrushPicker language={language} wide={wide} disabled={blown} onWide={onWide} />
         <FieldGuideButton language={language} count={treasures} motion={grains} bookRef={book} onFieldGuide={onFieldGuide}
           landed={treasureFlight?.phase === "landed" ? (treasureFlight.fresh ? "new" : "again") : undefined} />
-        {dugUp !== undefined && (
-          <p className="dig-chip" aria-label={text.dugUp} data-counted={finish?.phase === "counted" || undefined}>
-            <Star ref={chipStar} size={20} aria-hidden="true" />
-            <span>{shownCount}/{total}</span>
-          </p>
+        {dugUp !== undefined && shownCount !== undefined && (
+          <DugUpChip language={language} count={shownCount} total={total} counted={finish?.phase === "counted"} starRef={chipStar} />
         )}
       </DigBar>
       {flying && <Star className="dig-board-star" size={24} aria-hidden="true" style={flight} />}
@@ -539,27 +542,57 @@ export function DigBoardScreen({
             {Array.from({ length: 12 }, (_, grain) => <span key={grain} className="dig-grain" style={{ left: `${grain * 100 / 11}%`, "--grain-x": (grain - 5.5) / 3, "--grain-y": -1 - grain % 3 } as CSSProperties} />)}
           </span>}
         </div>
-        {/* Each slot keeps its place from the round's start: its empty
-            card turns away as the choice card turns in over it. */}
-        {asks && <div className="dig-choice-cards" data-motion={grains || undefined} role={choice ? "group" : undefined}
-          aria-label={choice ? text.whoIsIt : undefined} aria-hidden={choice ? undefined : true}>
+        {/* Both cards occupy the same slot so digging changes only their
+            opacity, never the board's position or the choice's identity. */}
+        {asks && <div className="dig-choice-cards" role={questionShown ? "group" : undefined}
+          aria-label={questionShown ? text.whoIsIt : undefined} aria-hidden={questionShown ? undefined : true}>
           {Array.from({ length: choiceCount }, (_, at) => {
             const card = choices[at];
             return (
-              <div key={at} className="dig-choice-slot" style={{ "--choice": at } as CSSProperties}>
-                <span className="dig-empty-card" aria-hidden="true" data-turned={card ? true : undefined}>?</span>
+              <div key={at} className="dig-choice-slot">
+                <span className="dig-empty-card" aria-hidden="true" style={{ opacity: 1 - choicesShown }}>?</span>
                 {card && <Button className="dig-choice-card" data-choice={card.id} data-rejected={card.rejected || undefined} data-correct={card.correct || undefined}
-                  disabled={blown || card.rejected} aria-label={`${text.whoIsIt}: ${card.name.toLocaleUpperCase(language)}${card.correct ? `: ${text.digChoice.right}` : card.rejected ? `: ${text.digChoice.tryAnother}` : ""}`} onClick={() => onPick?.(card.id)}>
+                  style={{ opacity: choicesShown }} disabled={!questionShown || blown || card.rejected} tabIndex={questionShown ? undefined : -1}
+                  aria-label={`${text.whoIsIt}: ${card.name.toLocaleUpperCase(language)}${card.correct ? `: ${text.digChoice.right}` : card.rejected ? `: ${text.digChoice.tryAnother}` : ""}`} onClick={() => onPick?.(card.id)}>
                   <Picture className="dig-choice-picture" src={card.picture} alt="" width={800} height={600} />
-                  <span className="dig-choice-name" style={{ "--letters": card.name.length } as CSSProperties}>{card.name.toLocaleUpperCase(language)}</span>
-                  {card.correct && <span className="dig-choice-mark dig-choice-mark-correct" aria-hidden="true">✓</span>}
-                  {card.rejected && <span className="dig-choice-mark dig-choice-mark-rejected" aria-hidden="true">↻ {text.digChoice.tryAnother}</span>}
+                  <ChoiceName name={card.name.toLocaleUpperCase(language)} />
+                  {card.correct && <span className="dig-choice-mark dig-choice-mark-correct" aria-hidden="true"><Check size={28} /></span>}
+                  {card.rejected && <span className="dig-choice-mark dig-choice-mark-rejected" aria-hidden="true"><RotateCcw size={16} />{text.digChoice.tryAnother}</span>}
                 </Button>}
               </div>
             );
           })}
         </div>}
       </div>
+      <BrushButtons language={language} wide={wide} disabled={blown} onWide={onWide} />
     </main>
+  );
+}
+
+// The longest name a phone's card holds on one line at 12 pixels.
+export const ONE_LINE_LETTERS = 14;
+// The roots a long name breaks before, the dinosaur's "lizard" first.
+const ROOTS = ["SAURUS", "ЗАВР", "LOPHUS", "RHYNCHUS"];
+
+// A long name broken in two before its root, the first line ending in a
+// hyphen; a name that fits, or has no root to break before, is one line.
+export function nameLines(name: string): string[] {
+  if (name.length <= ONE_LINE_LETTERS) return [name];
+  for (const root of ROOTS) {
+    const at = name.lastIndexOf(root);
+    if (at >= 3) return [`${name.slice(0, at)}-`, name.slice(at)];
+  }
+  return [name];
+}
+
+// A choice's name, sized by its whole length where it is one line, and,
+// on a phone, by its longer line, broken before its root.
+function ChoiceName({ name }: { name: string }) {
+  const lines = nameLines(name);
+  const [head, tail] = lines;
+  return (
+    <span className="dig-choice-name" style={{ "--letters": name.length, "--line-letters": Math.max(...lines.map((line) => line.length)) } as CSSProperties}>
+      {tail === undefined ? name : <>{head?.slice(0, -1)}<span className="dig-choice-hyphen">-</span><br className="dig-choice-break" />{tail}</>}
+    </span>
   );
 }

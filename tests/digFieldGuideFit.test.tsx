@@ -4,40 +4,13 @@ import { DigFieldGuideScreen } from "../src/DigFieldGuideScreen.tsx";
 import { TREASURE_KINDS } from "../src/dig/index.ts";
 import { LANGUAGES, type Language } from "../src/language/language.ts";
 import { TEXTS } from "../src/language/texts.ts";
+import { EMS } from "./digFieldGuideWords.ts";
 import { withPictures } from "./pictures.tsx";
 import { fakeTreasurePicture } from "./support.ts";
 import { openWindow, windowsAnd } from "./windowSizes.ts";
 
-// jsdom lays nothing out, so the width of each word on the FIELD GUIDE is
-// given here in ems of its face, rounded up: Lexend's for the Latin words,
-// and the iPad's own face for the Cyrillic ones, which Lexend has no
-// letters for. The title and names at their bold, HOME and BACK at their
-// semibold. A word missing here fails the test that reads it.
-const EMS: Record<string, number> = {
-  SHELL: 3.3,
-  TOOTH: 3.8,
-  AMBER: 3.7,
-  EGG: 2.3,
-  NEST: 2.8,
-  GOLDEN: 4.5,
-  FOSSIL: 3.9,
-  РАКУШКА: 5.0,
-  ЗУБ: 2.0,
-  ЯНТАРЬ: 4.0,
-  ГНЕЗДО: 4.1,
-  С: 0.8,
-  ЯЙЦАМИ: 4.5,
-  ЗОЛОТАЯ: 4.9,
-  ОКАМЕНЕЛОСТЬ: 8.4,
-  "FIELD GUIDE": 7.1,
-  "ПОЛЕВОЙ ДНЕВНИК": 10.0,
-  HOME: 3.1,
-  BACK: 2.9,
-  ДОМОЙ: 3.9,
-  НАЗАД: 3.5,
-  "5/5": 1.8
-};
-
+// jsdom lays nothing out, so each word on the FIELD GUIDE is given its
+// width in ems. A word missing there fails the test that reads it.
 const emsOf = (word: string) => {
   const ems = EMS[word];
   if (ems === undefined) throw new Error(`No width for ${word}`);
@@ -85,10 +58,10 @@ describe.each(LANGUAGES)("the FIELD GUIDE in %s", (language) => {
     const room = width - px(outer.paddingLeft) - px(outer.paddingRight) - button(text.home) - button(text.back) - kinds - 3 * px(bar.gap);
     // The book, its gap and the title's letters, at most 0.75 of their size.
     const mark = px(style(".dig-mark").width) + px(style(".dig-title").gap);
-    expect(title.fontSize).toBe("min(40px, (100cqi - 66px) / (var(--letters) * 0.75))");
-    expect(mark).toBe(66);
+    expect(title.fontSize).toBe("min(34px, (100cqi - 60px) / (var(--letters) * 0.75))");
+    expect(mark).toBe(60);
     expect(emsOf(text.fieldGuide)).toBeLessThanOrEqual(text.fieldGuide.length * 0.75);
-    const size = Math.min(40, (room - mark) / (text.fieldGuide.length * 0.75));
+    const size = Math.min(34, (room - mark) / (text.fieldGuide.length * 0.75));
 
     expect([style(".dig-title").whiteSpace, size >= 32]).toEqual(["nowrap", true]);
     expect(mark + emsOf(text.fieldGuide) * size).toBeLessThanOrEqual(room);

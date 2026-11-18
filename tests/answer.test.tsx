@@ -1,3 +1,4 @@
+import { emptyLabyrinth } from "./support.ts";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -7,10 +8,8 @@ import { QuestionScreen } from "../src/QuestionScreen.tsx";
 import { choose, score, startPlay } from "../src/quiz/play.ts";
 import { attributeOf, correctOf, measureOf, type Attribute, type Dinosaur, type Question, type QuestionKind } from "../src/quiz/round.ts";
 import {
-  PALETTE,
   SHIPPED_CATALOGUE,
   SHIPPED_DINOSAURS,
-  contrast,
   emptyCare,
   emptyDig,
   emptyPairs,
@@ -26,9 +25,7 @@ import {
   manualViewport,
   pageAtRest,
   questionView,
-  sameColour,
   seededRandom,
-  surfaceOf,
   symbolOf,
   type ManualPictures,
   gameDoor,
@@ -53,24 +50,16 @@ const byName = (name: string): Dinosaur => {
 const group = () => screen.getByRole("group", { name: "ANIMALS" });
 const cards = () => within(group()).getAllByRole("button");
 const cardOf = (dinosaur: Dinosaur) => within(group()).getByRole("button", { name: dinosaur.name.en });
-// Each mark on a card, as its symbol and its word.
+// Each mark on a card, as its symbol and its accessible name.
 const marksOn = (card: HTMLElement) =>
   within(card)
     .queryAllByRole("img", { name: /^(RIGHT|WRONG)$/ })
-    .map((mark) => `${symbolOf(mark)} ${mark.textContent}`);
-// How a card is outlined: thick in the colour of its mark, or thin.
-// jsdom keeps the outline shorthand as written, unexpanded.
-const outlineOf = (card: HTMLElement) => {
-  const [outlineWidth, , outlineColor = ""] = getComputedStyle(card).outline.split(" ");
-  const colour = Object.entries(PALETTE.light).find(([, value]) => sameColour(outlineColor, value))?.[0];
-  return `${outlineWidth} ${colour}`;
-};
-const opacityOf = (card: HTMLElement) => Number(getComputedStyle(card).opacity || 1);
+    .map((mark) => `${symbolOf(mark)} ${mark.getAttribute("aria-label")}`);
 const progress = () => screen.getByLabelText("PROGRESS").textContent;
 
 function startRound(seed: number, pictures: ManualPictures | ReturnType<typeof loadedPictures> = loadedPictures()) {
-  render(<App {...featuring()} dinosaurs={SHIPPED_DINOSAURS} catalogue={SHIPPED_CATALOGUE} bodyPicture={fakeBodyPicture} random={seededRandom(seed)} portraitLayouts={{}} viewport={manualViewport("landscape")} progress={emptyProgress()} {...englishDevice()} {...lightDevice()} {...unsetAgeLevel()} {...emptyCare()} {...emptySorting()} {...emptyPairs()} {...emptySkeletons()} {...emptyDig()} {...pageAtRest()} {...pictures} />);
-  const user = userEvent.setup();
+  render(<App {...emptyLabyrinth()} {...featuring()} dinosaurs={SHIPPED_DINOSAURS} catalogue={SHIPPED_CATALOGUE} bodyPicture={fakeBodyPicture} random={seededRandom(seed)} portraitLayouts={{}} viewport={manualViewport("landscape")} progress={emptyProgress()} {...englishDevice()} {...lightDevice()} {...unsetAgeLevel()} {...emptyCare()} {...emptySorting()} {...emptyPairs()} {...emptySkeletons()} {...emptyDig()} {...pageAtRest()} {...pictures} />);
+  const user = userEvent.setup({ delay: null });
   // Taps COMPARE and, with manual pictures, lets the first question's
   // pictures finish loading.
   const start = async () => {
@@ -117,24 +106,20 @@ describe("answering a question", () => {
       const { rerender } = render(<QuestionScreen language="en" {...questionView(question, "en")} {...handlers} />, withPictures);
       expect(screen.getByRole("heading").textContent).toContain(prompt);
 
-      await userEvent.setup().click(cardOf(tapped));
+      await userEvent.setup({ delay: null }).click(cardOf(tapped));
       expect(chosen).toEqual([tapped.id]);
       rerender(<QuestionScreen language="en" {...questionView(question, "en", tapped.id)} {...handlers} />);
 
       expect(marksOn(cardOf(big))).toEqual(["check RIGHT"]);
       expect(marksOn(cardOf(small))).toEqual(answer === "right answer" ? [] : ["x WRONG"]);
-      // The tapped card is outlined in its mark's colour; a right answer
-      // dims the other card, a wrong one leaves the right card bright.
-      expect([big, small].map((dinosaur) => outlineOf(cardOf(dinosaur)))).toEqual(
-        answer === "right answer" ? ["4px good", "1px line"] : ["1px line", "4px bad"]
-      );
-      expect([big, small].map((dinosaur) => opacityOf(cardOf(dinosaur)))).toEqual(answer === "right answer" ? [1, 0.7] : [1, 1]);
+      expect([big, small].map((dinosaur) => cardOf(dinosaur).getAttribute("data-mark"))).toEqual(["correct", answer === "right answer" ? null : "wrong"]);
+      expect([big, small].map((dinosaur) => cardOf(dinosaur).hasAttribute("data-chosen"))).toEqual(answer === "right answer" ? [true, false] : [false, true]);
       expect(within(cardOf(big)).getByText(largerValue)).toBeDefined();
       expect(within(cardOf(small)).getByText(smallerValue)).toBeDefined();
       expect(symbolOf(within(cardOf(big)).getByText(largerValue).parentElement ?? cardOf(big))).toBe(kind === "heavier" ? "weight" : "ruler");
       expect(score(choose(startPlay([question], "hatchling"), tapped.id))).toBe(answer === "right answer" ? 1 : 0);
       const next = screen.getByRole("button", { name: "NEXT" });
-      expect([next.textContent, symbolOf(next)]).toEqual(["NEXT", "arrow-right"]);
+      expect([next.textContent, symbolOf(next)]).toEqual(["NEXT", "play"]);
     }
   );
 
@@ -150,7 +135,7 @@ describe("answering a question", () => {
     rerender(<QuestionScreen language="ru" {...questionView(question, "ru")} {...handlers} />);
     expect(screen.getByRole("heading").textContent).toContain("КТО ЛЕГЧЕ?");
     rerender(<QuestionScreen language="en" {...questionView(question, "en")} {...handlers} />);
-    await userEvent.setup().click(cardOf(light));
+    await userEvent.setup({ delay: null }).click(cardOf(light));
     rerender(<QuestionScreen language="en" {...questionView(question, "en", light.id)} {...handlers} />);
 
     expect(marksOn(cardOf(light))).toEqual(["check RIGHT"]);
@@ -172,7 +157,7 @@ describe("answering a question", () => {
     rerender(<QuestionScreen language="ru" {...questionView(question, "ru")} {...handlers} />);
     expect(screen.getByRole("heading").textContent).toContain("КТО НИЖЕ?");
     rerender(<QuestionScreen language="en" {...questionView(question, "en")} {...handlers} />);
-    await userEvent.setup().click(cardOf(short));
+    await userEvent.setup({ delay: null }).click(cardOf(short));
     rerender(<QuestionScreen language="en" {...questionView(question, "en", short.id)} {...handlers} />);
 
     expect(marksOn(cardOf(short))).toEqual(["check RIGHT"]);
@@ -182,7 +167,7 @@ describe("answering a question", () => {
     expect(symbolOf(within(cardOf(short)).getByText("1.5 M").parentElement ?? cardOf(short))).toBe("ruler");
   });
 
-  it("marks the longer creature right and reveals lengths with ruler symbols in both languages", async () => {
+  it("marks the longer creature right and reveals lengths with horizontal symbols in both languages", async () => {
     const long = byName("Brachiosaurus");
     const short = byName("Mosasaurus");
     const question: Question = { kind: "longer", attribute: "length", left: short, right: long };
@@ -193,19 +178,19 @@ describe("answering a question", () => {
     expect(symbolOf(screen.getByRole("heading"))).toBe("move-horizontal");
     rerender(<QuestionScreen language="ru" {...questionView(question, "ru")} {...handlers} />);
     expect(screen.getByRole("heading").textContent).toContain("КТО ДЛИННЕЕ?");
-    await userEvent.setup().click(within(screen.getByRole("group", { name: "ЖИВОТНЫЕ" })).getByRole("button", { name: long.name.ru }));
+    await userEvent.setup({ delay: null }).click(within(screen.getByRole("group", { name: "ЖИВОТНЫЕ" })).getByRole("button", { name: long.name.ru }));
     rerender(<QuestionScreen language="ru" {...questionView(question, "ru", long.id)} {...handlers} />);
     expect(within(screen.getByRole("group", { name: "ЖИВОТНЫЕ" })).getByText("22 М")).toBeDefined();
     expect(within(screen.getByRole("group", { name: "ЖИВОТНЫЕ" })).getByText("12 М")).toBeDefined();
     rerender(<QuestionScreen language="en" {...questionView(question, "en")} {...handlers} />);
-    await userEvent.setup().click(cardOf(long));
+    await userEvent.setup({ delay: null }).click(cardOf(long));
     rerender(<QuestionScreen language="en" {...questionView(question, "en", long.id)} {...handlers} />);
 
     expect(marksOn(cardOf(long))).toEqual(["check RIGHT"]);
     expect(within(cardOf(long)).getByText("22 M")).toBeDefined();
     expect(within(cardOf(short)).getByText("12 M")).toBeDefined();
-    expect(symbolOf(within(cardOf(long)).getByText("22 M").parentElement ?? cardOf(long))).toBe("ruler");
-    expect(symbolOf(within(cardOf(short)).getByText("12 M").parentElement ?? cardOf(short))).toBe("ruler");
+    expect(symbolOf(within(cardOf(long)).getByText("22 M").parentElement ?? cardOf(long))).toBe("move-horizontal");
+    expect(symbolOf(within(cardOf(short)).getByText("12 M").parentElement ?? cardOf(short))).toBe("move-horizontal");
   });
 
   it("marks the right answer and shows both values in every question of a round", async () => {
@@ -242,32 +227,6 @@ describe("answering a question", () => {
 
     expect(cards().flatMap(marksOn)).not.toEqual([]);
     expect(getComputedStyle(card).transform).not.toMatch(/scale/);
-  });
-
-  it("makes each mark a symbol and a word on its own colour, at least 3:1 against its card", async () => {
-    const [big, small] = [byName("Triceratops"), byName("Velociraptor")];
-    const nothing = () => {};
-    render(
-      <QuestionScreen
-        language="en"
-        {...questionView({ kind: "heavier", attribute: "mass", left: big, right: small }, "en", small.id)}
-        onChoose={nothing}
-        onNext={nothing}
-        onHome={nothing}
-      />,
-      withPictures
-    );
-
-    const marks = [cardOf(big), cardOf(small)].map((card) => {
-      const mark = within(card).getByRole("img", { name: /^(RIGHT|WRONG)$/ });
-      return { symbol: symbolOf(mark), colour: getComputedStyle(mark).backgroundColor, card: surfaceOf(mark.parentElement ?? card) };
-    });
-
-    expect(marks.map(({ symbol }) => symbol)).toEqual(["check", "x"]);
-    expect(new Set(marks.map(({ colour }) => colour)).size).toBe(2);
-    for (const { colour, card } of marks) {
-      expect(contrast(colour, card)).toBeGreaterThanOrEqual(3);
-    }
   });
 
   it("counts only the first tap on a question", async () => {

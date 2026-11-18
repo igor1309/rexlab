@@ -1,7 +1,10 @@
+import type { Theme } from "../src/theme.ts";
+import { gameDoor } from "./support.ts";
+import { emptyLabyrinth } from "./support.ts";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import type { AgeLevelSetting } from "../src/ageLevel.ts";
-import { App, type AppProps } from "../src/App.tsx";
+import { App, type AppProps, type PortraitLayouts } from "../src/App.tsx";
 import { dealBoard, type Board, type BoardLevel, type ClimbLevel, type LargeLevel, type Pal, type Random } from "../src/pairs/index.ts";
 import type { LevelOffer } from "../src/levelOffer.ts";
 import { AGE_LEVEL_KEY, localAgeLevel } from "../src/localAgeLevel.ts";
@@ -46,8 +49,10 @@ export type PairsAppOptions<C extends Clock> = {
   clock?: C;
   reducedMotion?: boolean;
   viewport?: ManualViewport;
+  // The screens with a portrait layout, none unless given.
+  portraitLayouts?: PortraitLayouts;
   deviceLanguage?: string;
-  theme?: "light" | "dark";
+  theme?: Theme;
   // The age level a parent picked, or "unset" for none picked yet.
   ageLevel?: AgeLevelSetting | "unset";
   // Reuse the parent's saved setting across app reloads, independently
@@ -55,6 +60,9 @@ export type PairsAppOptions<C extends Clock> = {
   settingsStorage?: MemoryStorage;
   // Told each game whose start the app counts.
   startCounter?: AppProps["startCounter"];
+  // How the page's parts are measured and moved as it turns, a page at
+  // rest unless given.
+  layoutMotion?: AppProps["layoutMotion"];
 };
 
 // The age level the climb is played at, so a test about the climb sees it.
@@ -74,22 +82,24 @@ export function openPairsApp<C extends Clock = ReturnType<typeof manualTimers>>(
   clock = manualTimers() as unknown as C,
   reducedMotion = false,
   viewport = manualViewport("landscape"),
+  portraitLayouts = {},
   deviceLanguage = "en-GB",
   theme = "light",
   ageLevel = PICKED_HATCHLING,
   settingsStorage,
-  startCounter
+  startCounter,
+  layoutMotion
 }: PairsAppOptions<C> = {}) {
   const ageLevels = settingsStorage ?? ageLevelStorage(ageLevel);
   const view = render(
-    <App
+    <App {...emptyLabyrinth()}
       {...featuring()}
       {...(startCounter && { startCounter })}
       dinosaurs={SHIPPED_DINOSAURS}
       catalogue={SHIPPED_CATALOGUE}
       bodyPicture={fakeBodyPicture}
       random={random}
-      portraitLayouts={{}}
+      portraitLayouts={portraitLayouts}
       viewport={viewport}
       progress={localProgress(() => storage)}
       deviceLanguage={deviceLanguage}
@@ -106,6 +116,7 @@ export function openPairsApp<C extends Clock = ReturnType<typeof manualTimers>>(
       {...emptySkeletons()}
       {...emptyDig()}
       {...pageAtRest()}
+      {...(layoutMotion && { layoutMotion })}
       sortables={SHIPPED_SORTABLES}
       sortingProgress={localSortingProgress(() => storage)}
       reducedMotion={() => reducedMotion}
@@ -113,7 +124,7 @@ export function openPairsApp<C extends Clock = ReturnType<typeof manualTimers>>(
     />
   );
   loadShownPictures(clock);
-  return { user: userEvent.setup(), clock, storage, ageLevels, unmount: view.unmount };
+  return { user: userEvent.setup({ delay: null }), clock, storage, ageLevels, unmount: view.unmount };
 }
 
 // Find the pair's entry as it is stored, under the names it kept from
@@ -148,7 +159,10 @@ export function board(): HTMLElement {
   if (!found) throw new Error("No board on the screen");
   return found;
 }
-export const pairCards = () => within(board()).getAllByRole("button");
+// The board's cards in their places, by their class: a role query weighs
+// every element's style at each card turned. A test of the board's own
+// holds the cards to their role.
+export const pairCards = () => [...board().querySelectorAll<HTMLElement>(".pair-card")];
 
 const cardAt = (place: number) => {
   const card = pairCards()[place];
@@ -171,7 +185,7 @@ export async function turnCard(user: UserEvent, place: number) {
 // Opens the game and deals a board, its pictures loaded at once: at the
 // level named on its switch, or else at the level the game starts at.
 export async function playPairs(user: UserEvent, level?: string) {
-  await user.click(screen.getByRole("button", { name: "FIND THE PAIR" }));
+  await user.click(gameDoor("FIND THE PAIR"));
   if (level !== undefined) await user.click(screen.getByRole("button", { name: level }));
   await user.click(screen.getByRole("button", { name: "PLAY" }));
 }

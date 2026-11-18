@@ -1,6 +1,7 @@
-import { ArrowLeft, BookOpen, Brush, House, type LucideIcon } from "lucide-react";
+import { ArrowLeft, BookOpen, House, PaintbrushVertical, Star, type LucideIcon } from "lucide-react";
 import type { CSSProperties, ReactNode, Ref } from "react";
 import { Button } from "./Button.tsx";
+import { EarthEdge } from "./EarthEdge.tsx";
 import type { Language } from "./language/language.ts";
 import { TEXTS } from "./language/texts.ts";
 
@@ -11,7 +12,7 @@ import { TEXTS } from "./language/texts.ts";
 export function DigBar({
   language,
   title,
-  Mark = Brush,
+  Mark = PaintbrushVertical,
   onHome,
   onBack,
   children
@@ -25,31 +26,44 @@ export function DigBar({
 }) {
   const text = TEXTS[language];
   const words = title ?? text.dig;
+  const lines = twoLines(words);
   return (
     <header className="dig-bar">
       {onHome && (
         <Button className="home-button" onClick={onHome}>
           <House size={24} aria-hidden="true" />
-          {text.home}
+          <span className="upright-hidden">{text.home}</span>
         </Button>
       )}
       {onBack && (
         <Button className="home-button" onClick={onBack}>
           <ArrowLeft size={24} aria-hidden="true" />
-          {text.back}
+          <span className="upright-hidden">{text.back}</span>
         </Button>
       )}
       <h1 className="dig-title">
         <span className="dig-mark" aria-hidden="true">
           <Mark size={28} />
         </span>
-        <span className="dig-title-words" style={{ "--letters": words.length } as CSSProperties}>
+        <span className="dig-title-words" style={{ "--letters": words.length, "--line-letters": Math.max(...lines.map((line) => line.length)), "--lines": lines.length } as CSSProperties}>
           {words}
         </span>
       </h1>
       {children}
     </header>
   );
+}
+
+// A title split where its longer line is shortest, so where it may take
+// two lines, as on a phone, it can be as large as that line allows.
+export function twoLines(words: string): string[] {
+  const parts = words.split(" ");
+  let best = [words];
+  for (let at = 1; at < parts.length; at++) {
+    const lines = [parts.slice(0, at).join(" "), parts.slice(at).join(" ")];
+    if (Math.max(...lines.map((line) => line.length)) < Math.max(...best.map((line) => line.length))) best = lines;
+  }
+  return best;
 }
 
 // The picker of DIG's two brushes, before the FIELD GUIDE: each button a
@@ -71,6 +85,59 @@ export function BrushPicker({ language, wide, disabled, onWide }: {
         </Button>
       ))}
     </span>
+  );
+}
+
+// On a phone the brushes are two wide buttons under the board, each its
+// dot and its name, the picked one filled in amber.
+export function BrushButtons({ language, wide, disabled, onWide }: {
+  language: Language;
+  wide: boolean;
+  disabled?: boolean;
+  onWide: (wide: boolean) => void;
+}) {
+  const text = TEXTS[language];
+  return (
+    <span className="dig-brush-buttons">
+      {[false, true].map((option) => (
+        <Button key={String(option)} className="dig-brush-button" aria-pressed={wide === option} disabled={disabled} onClick={() => onWide(option)}>
+          <span className="dig-brush-slot" aria-hidden="true">
+            <span className="dig-brush-dot" data-wide={option || undefined} />
+          </span>
+          {option ? text.wideBrush : text.brush}
+        </Button>
+      ))}
+    </span>
+  );
+}
+
+// The dinosaurs dug up so far, out of all of them, on DIG's bar: the star,
+// DUG UP and the count, read out as DUG UP and the count.
+export function DugUpChip({ language, count, total, counted, starRef }: {
+  language: Language;
+  count: number;
+  total: number;
+  counted?: boolean;
+  starRef?: Ref<SVGSVGElement>;
+}) {
+  const text = TEXTS[language];
+  return (
+    <p className="dig-chip" aria-label={text.dugUp} data-counted={counted || undefined}>
+      <Star ref={starRef} size={26} fill="currentColor" aria-hidden="true" />
+      <span className="dig-chip-words" aria-hidden="true">{text.dugUp}</span>
+      <span className="dig-chip-count">{count}<span className="dig-chip-of">/{total}</span></span>
+    </p>
+  );
+}
+
+// The dig site under every dig screen: the sky the page shows, the sand
+// below its wavy edge, and the ochre layer along the bottom.
+export function DigGround() {
+  return (
+    <div className="dig-ground" aria-hidden="true">
+      <div className="dig-ground-sand"><EarthEdge className="dig-ground-wave" /></div>
+      <div className="dig-ground-ochre"><EarthEdge className="dig-ground-wave" /></div>
+    </div>
   );
 }
 

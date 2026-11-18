@@ -40,7 +40,7 @@ const declarationsOf = (body: string) =>
       return { property: declaration.slice(0, colon).trim(), value: declaration.slice(colon + 1).trim() };
     });
 
-const CSS = readFileSync(join(import.meta.dirname, "../src/app.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const CSS = ["app.css", "labyrinthBoard.css", "labyrinthResult.css", "skeletonSite.css", "skeletonChoice.css", "skeletonPuzzle.css", "skeletonGuess.css", "skeletonMuseum.css", "skeletonResult.css", "picturePuzzleChoice.css", "picturePuzzleBoard.css", "picturePuzzleResult.css", "sandWriting.css", "careWelcome.css", "careVisit.css", "careResult.css"].map((file) => readFileSync(join(import.meta.dirname, "../src", file), "utf8")).join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
 const RULES = rulesOf(CSS);
 const REDUCED = RULES.filter(({ prelude }) => prelude === "@media (prefers-reduced-motion: reduce)").flatMap(({ body }) => rulesOf(body));
 const PLAIN = RULES.filter(({ prelude }) => !prelude.startsWith("@"));
@@ -63,6 +63,14 @@ const declared = (rules: Rule[], selector: string) =>
   Object.fromEntries(declarationsOf(rules.find(({ prelude }) => prelude === selector)?.body ?? "").map(({ property, value }) => [property, value]));
 
 describe("the motion", () => {
+  it("cross-fades both skeleton hero layers with shared normal and reduced timings", () => {
+    const layers = ".home-skeleton-hero > .skeletons-hero-fallback, .home-skeleton-hero > canvas";
+    expect(declared(PLAIN, layers).transition).toBe("opacity var(--motion-standard) var(--ease-out)");
+    expect(declared(REDUCED, layers)["transition-duration"]).toBe("var(--motion-small)");
+    expect(tokensOf(PLAIN)["--motion-standard"]).toBe("240ms");
+    expect(tokensOf(PLAIN)["--motion-small"]).toBe("160ms");
+  });
+
   it("fades the portrait gate in and out with the screen token, including the short reduced-motion fade", () => {
     expect(declared(PLAIN, ".orientation-gate").transition).toBe("opacity var(--motion-screen) var(--ease-out), visibility var(--motion-screen) var(--ease-out)");
     expect(declared(PLAIN, ".orientation-gate[data-shown]").animation).toBe("fade-in var(--motion-screen) var(--ease-out) both");
@@ -82,6 +90,7 @@ describe("the motion", () => {
       "--motion-stagger": "40ms",
       "--motion-picture": "200ms",
       "--motion-shimmer": "1500ms",
+      "--motion-scroll": "smooth",
       "--motion-alive": "360ms",
       "--motion-amount": "1"
     });
@@ -121,7 +130,9 @@ describe("the motion", () => {
       "--motion-screen": "160ms",
       "--motion-count": "0ms",
       "--motion-stagger": "0ms",
-      "--motion-amount": "0"
+      "--motion-amount": "0",
+      // A following view jumps instead of gliding.
+      "--motion-scroll": "auto"
     });
     // Every keyframe moves by --motion-amount, so it only fades where that
     // is 0; the count-up takes no time there.
@@ -160,6 +171,30 @@ describe("the motion", () => {
     ]);
   });
 
+  it("chomps the decoded welcome jaw twice and uses a short fade with reduced motion", () => {
+    expect(declared(PLAIN, ".whose-jaw-chomp[data-ready]").animation).toBe("whose-jaw-chomp var(--motion-alive) var(--ease-out) 2");
+    expect(declared(REDUCED, ".whose-jaw-chomp[data-ready]").animation).toBe("fade-in var(--motion-small) var(--ease-out) both");
+  });
+
+  it("animates the jaw pile and new shelf finds, with short fades for reduced motion", () => {
+    expect(declared(PLAIN, ".jaw-result-find").animation).toBe("jaw-to-shelf var(--motion-count) var(--ease-out) calc(var(--motion-screen) + var(--jaw) * var(--motion-stagger)) both");
+    for (const selector of [".whose-jaw-result h1", ".jaw-result-jaws li", ".jaw-result-find", ".jaw-result-actions"]) {
+      const reduced = REDUCED.find(({ prelude }) => prelude.split(",").map((part) => part.trim()).includes(selector));
+      expect(declarationsOf(reduced?.body ?? "")).toContainEqual({ property: "animation", value: "fade-in var(--motion-small) var(--ease-out) both" });
+    }
+  });
+
+  it("raises shelf rows and cards, chomps twice after decode and only fades with reduced motion", () => {
+    expect(declared(PLAIN, ".jaw-shelf-row").animation).toBe("rise-in var(--motion-screen) var(--ease-out) both");
+    expect(declared(PLAIN, ".jaw-shelf-card").animation).toBe("rise-in var(--motion-screen) var(--ease-out) both");
+    expect(declared(PLAIN, ".jaw-card-chomp[data-ready]").animation).toBe("jaw-chomp var(--motion-alive) var(--ease-out) 2");
+    for (const selector of [".jaw-shelf-row", ".jaw-shelf-card", ".jaw-card-chomp[data-ready]"]) {
+      const reduced = REDUCED.find(({ prelude }) => prelude.split(",").map((part) => part.trim()).includes(selector));
+      expect(declarationsOf(reduced?.body ?? "")).toContainEqual({ property: "animation", value: "fade-in var(--motion-small) var(--ease-out) both" });
+    }
+    expect(declared(REDUCED, ".jaw-card-scrim[data-leaving]").animation).toBe("fade-out var(--motion-small) var(--ease-out) both");
+  });
+
   it("has reduced motion win over the rules it overrides: none of them comes after it to undo it", () => {
     const reducedAt = RULES.findIndex(({ prelude }) => prelude === "@media (prefers-reduced-motion: reduce)");
     const overridden = new Set(REDUCED.map(({ prelude }) => prelude));
@@ -182,6 +217,33 @@ const animationsOf = (rules: Rule[]) =>
         .flatMap(({ value }) => prelude.split(",").map((selector) => [selector.trim(), value.split(" ")[0]] as const))
     )
   );
+
+describe("the labyrinth board's motion", () => {
+  it("moves the baby for one step with the shared timing and replaces travel with a short fade", () => {
+    expect(declared(PLAIN, ".labyrinth-step").animation).toBe("labyrinth-step var(--motion-standard) var(--ease-out) both");
+    const frames = rulesOf(KEYFRAMES.find(({ prelude }) => prelude === "@keyframes labyrinth-step")!.body);
+    expect(declared(frames, "from").translate).toBe("calc(var(--step-x) * var(--cell) * var(--motion-amount)) calc(var(--step-y) * var(--cell) * var(--motion-amount))");
+    for (const selector of [".labyrinth-board-screen", ".labyrinth-step"]) {
+      const reduced = REDUCED.find(({ prelude }) => prelude.split(",").map((part) => part.trim()).includes(selector));
+      expect(declarationsOf(reduced?.body ?? "")).toContainEqual({ property: "animation", value: "fade-in var(--motion-small) var(--ease-out) both" });
+    }
+  });
+});
+
+describe("the labyrinth reunion's motion", () => {
+  it("arrives and rewards with shared motion that becomes a short fade", () => {
+    expect(declared(PLAIN, ".labyrinth-result-screen").animation).toBe("rise-in var(--motion-screen) var(--ease-out) both");
+    expect(declared(PLAIN, ".star-won").animation).toBe("pop-in var(--motion-standard) var(--ease-overshoot) both");
+    expect(declared(PLAIN, ".star-won")["animation-delay"]).toBe("calc(var(--star) * var(--motion-stagger) * 1.5)");
+    for (const name of ["rise-in", "pop-in"]) {
+      const frames = rulesOf(KEYFRAMES.find(({ prelude }) => prelude === `@keyframes ${name}`)!.body);
+      const from = declared(frames, "from");
+      expect(from.opacity).toBe("0");
+      expect(from.translate ?? from.scale).toContain("var(--motion-amount)");
+    }
+    expect(tokensOf(REDUCED)).toMatchObject({ "--motion-amount": "0", "--motion-screen": "160ms", "--motion-standard": "160ms", "--motion-stagger": "0ms" });
+  });
+});
 
 describe("the dig board's collection star", () => {
   it("flies from the dinosaur at --star-x and --star-y to the chip, and only fades in with reduced motion", () => {
@@ -236,16 +298,13 @@ describe("the dig brush", () => {
 });
 
 describe("the dig question's cards", () => {
-  it("turn each empty card edge on and the choice card on from there, and only fade with reduced motion", () => {
-    const frames = (name: string) => rulesOf(KEYFRAMES.find(({ prelude }) => prelude === `@keyframes ${name}`)?.body ?? "")
-      .map(({ prelude, body }) => [prelude, Object.fromEntries(declarationsOf(body).map(({ property, value }) => [property, value]))]);
-    expect(frames("dig-turn-away")).toEqual([
-      ["99%", { opacity: "1" }],
-      ["to", { opacity: "0", transform: "rotateY(calc(90deg * var(--motion-amount)))" }]
-    ]);
-    expect(frames("dig-turn-in")).toEqual([["from", { opacity: "0", transform: "rotateY(calc(-90deg * var(--motion-amount)))" }]]);
-    expect(declared(REDUCED, ".dig-choice-cards[data-motion] .dig-empty-card[data-turned]")).toEqual({ animation: "fade-out var(--motion-small) var(--ease-out) both" });
-    expect(declared(REDUCED, ".dig-choice-cards[data-motion] .dig-choice-card")).toEqual({ animation: "fade-in var(--motion-small) var(--ease-out) both" });
+  it("lets digging drive opacity without an arrival animation or opacity transition, including reduced motion", () => {
+    for (const rules of [PLAIN, REDUCED]) {
+      const surfaces = rules.filter(({ prelude }) => prelude.split(",").some((selector) => /\.dig-(?:choice|empty)-card(?:\[|$)/.test(selector.trim())));
+      expect(surfaces.flatMap(({ body }) => declarationsOf(body).filter(({ property, value }) =>
+        property.startsWith("animation") || (property === "transition" && /\b(opacity|all)\b/.test(value))))).toEqual([]);
+    }
+    expect(KEYFRAMES.filter(({ prelude }) => prelude.startsWith("@keyframes dig-turn"))).toEqual([]);
   });
 
   it("leave the board where it stands: no rule moves it or transitions it", () => {
@@ -383,10 +442,10 @@ describe("care's motion", () => {
     expect(animations.get(".tray-item[data-suggested]::after")).toBe("fade-in");
   });
 
-  it("fills the hearts won, and rises friends in, one after the other", () => {
-    expect([".result-heart-won", ".friend-card", ".friend-face"].map((selector) => animations.get(selector))).toEqual(["pop-in", "rise-in", "rise-in"]);
+  it("fills the hearts won, rises friends in and pops the welcome's faces in, one after the other", () => {
+    expect([".result-heart-won", ".friends-dig-site .friend-card", ".care-face"].map((selector) => animations.get(selector))).toEqual(["pop-in", "rise-in", "pop-in"]);
     expect(delayOf(".result-heart-won")).toBe("calc(var(--heart) * var(--motion-stagger) * 1.5)");
-    expect(delayOf(".friend-card")).toBe("calc(var(--card) * var(--motion-stagger) * 0.75)");
+    expect(delayOf(".friends-dig-site .friend-card")).toBe("calc(var(--card) * var(--motion-stagger) * 0.75)");
   });
 
   it("only fades the need asked now in with reduced motion", () => {
@@ -440,7 +499,7 @@ describe("find the pair's motion", () => {
 
   it("folds the climb level in and out beside the stars, and only fades it with reduced motion", () => {
     expect(declared(PLAIN, ".pairs-climb").transition).toBe(
-      "grid-template-columns var(--motion-standard) var(--ease-out),\n    margin-right var(--motion-standard) var(--ease-out),\n    opacity var(--motion-standard) var(--ease-out)"
+      "grid-template-columns var(--motion-standard) var(--ease-out),\n    grid-template-rows var(--motion-standard) var(--ease-out),\n    margin var(--motion-standard) var(--ease-out),\n    opacity var(--motion-standard) var(--ease-out)"
     );
     expect(declared(PLAIN, ".pairs-climb[data-shown]")).toEqual({ "grid-template-columns": "1fr", "margin-right": "0", opacity: "1" });
     expect(declared(REDUCED, ".pairs-climb")).toEqual({ "transition-property": "opacity" });
@@ -719,10 +778,10 @@ describe("a picture's place", () => {
   });
 
   it("is silhouetted on a pair's card only once its picture shows, its shimmer and failure look keeping their colours", () => {
-    const silhouettes = PLAIN.filter(({ prelude, body }) => prelude.includes("pair-silhouette") && declarationsOf(body).some(({ property }) => property === "filter"));
-    expect(silhouettes.map(({ prelude }) => prelude.split(",\n"))).toEqual([
-      ['.pair-silhouette[data-picture="appearing"]', '.pair-silhouette[data-picture="shown"]'],
-      ['[data-theme="dark"] .pair-silhouette[data-picture="appearing"]', '[data-theme="dark"] .pair-silhouette[data-picture="shown"]']
+    const shown = '.pair-silhouette:is([data-picture="appearing"], [data-picture="shown"])';
+    expect([bodyOf(shown), bodyOf(`${shown} + .pair-card-shadow`)]).toEqual([
+      [{ property: "opacity", value: "0" }],
+      [{ property: "display", value: "block" }, { property: "animation", value: "fade-in var(--motion-picture) var(--ease-out) both" }]
     ]);
   });
 

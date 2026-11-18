@@ -2,21 +2,25 @@ import { expect } from "vitest";
 
 // jsdom lays nothing out, so the width of each title in every language
 // is given here in ems of its bold face, rounded up: Lexend's for the
-// Latin words, and the iPad's own face for the Cyrillic ones, which
-// Lexend has no letters for. A title missing here fails the test that
+// Latin words, and Manrope's for the Cyrillic ones, which Lexend has
+// no letters for (scripts/cyrillic-ems.cjs measures them). A title missing here fails the test that
 // reads it.
 export const TITLE_EMS: Record<string, number> = {
+  LABYRINTH: 6.4,
+  ЛАБИРИНТ: 5.6,
   COMPARE: 5.1,
-  СРАВНИ: 4.1,
+  СРАВНИ: 4.2,
   "ANCIENT REPTILES": 10.3,
-  // ANCIENT REPTILES may wrap on the large card, so each of its words is here.
+  "ДРЕВНИЕ ЯЩЕРЫ": 8.7,
+  // Both catalogue names may wrap on the large card, so each word is here.
   ANCIENT: 4.9,
   REPTILES: 5.2,
-  ВСЕ: 2.1,
+  ДРЕВНИЕ: 4.7,
+  ЯЩЕРЫ: 3.8,
   CARE: 2.8,
-  ЗАБОТА: 4.0,
+  ЗАБОТА: 4.1,
   SORT: 2.9,
-  РАЗЛОЖИ: 5.2,
+  РАЗЛОЖИ: 5.1,
   // FIND THE PAIR's title may wrap, so each line it may take is here.
   "FIND THE PAIR": 8.1,
   "FIND THE": 5.2,
@@ -26,20 +30,30 @@ export const TITLE_EMS: Record<string, number> = {
   PAIR: 2.7,
   "НАЙДИ ПАРУ": 6.6,
   НАЙДИ: 3.7,
-  ПАРУ: 2.7,
+  ПАРУ: 2.8,
   SKELETONS: 6.2,
-  СКЕЛЕТЫ: 4.8,
+  СКЕЛЕТЫ: 4.9,
   DIG: 2.1,
-  РАСКОПКИ: 5.8,
+  РАСКОПКИ: 5.6,
+  SAND: 3.2,
+  WRITING: 4.8,
+  "SAND WRITING": 8.3,
+  РИСОВАНИЕ: 6.3,
+  НА: 1.5,
+  ПЕСКЕ: 3.3,
+  "РИСОВАНИЕ НА": 7.9,
+  "НА ПЕСКЕ": 5,
+  "РИСОВАНИЕ НА ПЕСКЕ": 11.4,
   "MORE COMING": 7.9,
-  "СКОРО ЕЩЁ": 6.0
+  "СКОРО ЕЩЁ": 5.9
 };
 
 // The words each tile's title on the home page shows.
-export const TITLE_TEXTS: Record<string, "quizCard" | "catalogueTile" | "care" | "sort" | "skeletons" | "dig" | "moreComing"> = {
+export const TITLE_TEXTS: Record<string, "quizCard" | "catalogue" | "care" | "sort" | "skeletons" | "dig" | "moreComing" | "labyrinth"> = {
   "compare-tile-title": "quizCard",
-  "catalogue-tile-title": "catalogueTile",
+  "catalogue-tile-title": "catalogue",
   "care-tile-title": "care",
+  "labyrinth-tile-title": "labyrinth",
   "sort-tile-title": "sort",
   "skeletons-tile-title": "skeletons",
   "dig-tile-title": "dig",
@@ -50,7 +64,7 @@ export const TITLE_TEXTS: Record<string, "quizCard" | "catalogueTile" | "care" |
 export const tileTitles = () => [...document.querySelectorAll(Object.keys(TITLE_TEXTS).map((name) => `.${name}`).join(", "))];
 
 // Each count in a tile's picture's corner.
-export const TILE_COUNTS = ".compare-tile-best, .catalogue-tile-count, .care-tile-best, .sort-tile-best, .pairs-tile-stars, .skeletons-tile-best, .dig-tile-count";
+export const TILE_COUNTS = ".compare-tile-best, .catalogue-tile-count, .care-tile-best, .sort-tile-best, .pairs-tile-stars, .skeletons-tile-best, .dig-tile-count, .labyrinth-tile-best";
 
 const px = (value: string) => Number.parseFloat(value) || 0;
 
@@ -80,19 +94,19 @@ export function gamesWidths(width: number) {
 
 // The width a title has in a card `cardWidth` wide: the card's width,
 // short of the sides of the card and the row, and of the row's other
-// parts and the gaps between them.
-export function roomFor(title: Element, cardWidth: (card: Element) => number) {
+// parts and the gaps between them, each part's style read by `styleOf`.
+export function roomFor(title: Element, cardWidth: (card: Element) => number, styleOf: (element: Element) => CSSStyleDeclaration = getComputedStyle) {
   const row = title.parentElement;
   const card = title.closest("button, .more-coming");
   if (!row || !card) throw new Error("A title outside the games");
   const others = [...row.children].filter((child) => child !== title);
   return (
     cardWidth(card) -
-    sidesOf(getComputedStyle(card)) -
-    sidesOf(getComputedStyle(row)) -
+    sidesOf(styleOf(card)) -
+    sidesOf(styleOf(row)) -
     // A symbol drawn straight into the row is as wide as it is drawn.
-    others.reduce((sum, other) => sum + (px(getComputedStyle(other).width) || px(other.getAttribute("width") ?? "")), 0) -
-    columnGapOf(getComputedStyle(row)) * others.length
+    others.reduce((sum, other) => sum + (px(styleOf(other).width) || px(other.getAttribute("width") ?? "")), 0) -
+    columnGapOf(styleOf(row)) * others.length
   );
 }
 

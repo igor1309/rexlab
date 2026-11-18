@@ -1,3 +1,4 @@
+import { emptyLabyrinth } from "./support.ts";
 import { render, screen, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -62,7 +63,7 @@ function openApp(storage: MemoryStorage) {
   const local = () => storage;
   const featured = localFeatured(local, HOME_GAMES);
   const view = render(
-    <App
+    <App {...emptyLabyrinth()}
       dinosaurs={SHIPPED_DINOSAURS}
       catalogue={SHIPPED_CATALOGUE}
       bodyPicture={fakeBodyPicture}
@@ -96,10 +97,10 @@ function openApp(storage: MemoryStorage) {
       {...manualTimers()}
     />
   );
-  return { user: userEvent.setup(), container: view.container, unmount: view.unmount };
+  return { user: userEvent.setup({ delay: null }), container: view.container, unmount: view.unmount };
 }
 
-const button = (name: string) => screen.getByRole("button", { name });
+const button = (name: string) => document.querySelector(".home") ? gameDoor(name) : screen.getByRole("button", { name });
 const group = () => screen.getByRole("group", { name: "ANIMALS" });
 
 // Games with only Hatchling retain their play at every age level
@@ -145,7 +146,7 @@ async function answerEveryQuestionRight(user: UserEvent) {
 }
 
 describe("the same play", () => {
-  it.each(AGE_LEVELS)("earns the same reward at %s, and the COMPARE tile shows the best of the level the quiz plays", async (level) => {
+  it.each(AGE_LEVELS)("earns and saves the same reward at %s while the COMPARE tile omits its badge", async (level) => {
     const storage = iPadAt(level);
     const { user } = openApp(storage);
 
@@ -154,7 +155,7 @@ describe("the same play", () => {
     expect(screen.getByLabelText("SCORE").textContent).toBe("10/10");
     expect(screen.queryAllByRole("status").map((status) => status.getAttribute("aria-label"))).toEqual(["NEW BEST SCORE"]);
     await user.click(button("HOME"));
-    expect(badgeOf(gameDoor("COMPARE"))?.textContent).toBe("10");
+    expect(badgeOf(gameDoor("COMPARE"))).toBeNull();
     const best = (at: AgeLevel) => (at === level ? 10 : 6);
     expect(JSON.parse(storage.items.get(PROGRESS_KEY) ?? "").games["compare-dinosaurs"]).toEqual({ bestScore: best("hatchling"), explorerBest: best("explorer"), paleontologistBest: best("paleontologist"), roundsPlayed: 4 });
   });

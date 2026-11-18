@@ -6,11 +6,11 @@ import { LANGUAGES } from "../src/language/language.ts";
 import { TEXTS } from "../src/language/texts.ts";
 import { presentDigBoard } from "../src/presentation.ts";
 import { withPictures } from "./pictures.tsx";
-import { SHIPPED_DIG, fakeBodyPicture, fakeTreasurePicture } from "./support.ts";
+import { SHIPPED_DIG, fakeBodyPicture, fakeTreasurePicture, manualTimers } from "./support.ts";
 import { openWindow, windowsAnd } from "./windowSizes.ts";
 
 // jsdom does not lay out: each board title's width in ems of its face,
-// rounded up, Lexend bold for the Latin and the iPad's own face for the
+// rounded up, Lexend bold for the Latin and at least Manrope's for the
 // Cyrillic, as digFieldGuideFit.test.tsx measures its words.
 const EMS: Record<string, number> = { DIG: 2.2, "WHO IS IT?": 6.2, РАСКОПКИ: 5.7, "КТО ЭТО?": 4.9 };
 
@@ -56,7 +56,8 @@ describe.each(LANGUAGES.flatMap((language) => levels.map((level) => [language, l
     expect(Number(sizing[1])).toBe(height);
     const boardHeight = height - 180 + Number(sizing[2]) * Number(sizing[3]);
     expect([column.flexBasis, column.flexDirection, px(body.gap) + px(column.flexBasis)]).toEqual(["200px", "column", 228]);
-    expect(document.querySelectorAll(".dig-choice-card")).toHaveLength(asking ? CHOICES[level] : 0);
+    // Invisible and visible choices occupy identical slots.
+    expect(document.querySelectorAll(".dig-choice-card")).toHaveLength(CHOICES[level]);
     expect(document.querySelectorAll(".dig-choice-slot .dig-empty-card")).toHaveLength(CHOICES[level]);
     expect(document.querySelector(".dig-choice-cards")?.getAttribute("aria-hidden")).toBe(asking ? null : "true");
 
@@ -72,7 +73,7 @@ describe.each(LANGUAGES.flatMap((language) => levels.map((level) => [language, l
 
       const slot = style(".dig-choice-slot");
       expect([slot.flex, slot.maxHeight]).toEqual(["1 1 0px", "170px"]);
-      if (asking) {
+      {
         const card = style(".dig-choice-card");
         const picture = style(".dig-choice-picture");
         expect([card.display, card.flexDirection, picture.flex, picture.height, picture.objectFit]).toEqual(["flex", "column", "1 1 auto", "0px", "contain"]);
@@ -97,14 +98,21 @@ describe.each(LANGUAGES.flatMap((language) => levels.map((level) => [language, l
       const pickerWidth = px(picker.paddingLeft) + 2 * px(style(".dig-brush-option").width) + px(picker.gap) + px(picker.paddingRight) + px(style(".dig-bar").gap);
       // The title shrinks to the room left, its letters at most 0.75 of
       // its size wide, and stays at least 30 pixels large.
-      const titleRoom = roomWidth - 180 - 110 - 48 - guideWidth - pickerWidth;
+      // DUG UP: its star, a count of up to two digits, and where the bar
+      // is wide enough its words and the total; and the bar's gap.
+      const chip = style(".dig-chip");
+      const words = style(".dig-chip-words");
+      const wordsWidth = words.display === "none" ? 0 : 6 * (0.75 * px(words.fontSize) + px(words.letterSpacing)) + px(chip.gap);
+      const count = style(".dig-chip-count");
+      const chipWidth = 26 + px(chip.gap) + wordsWidth + 2 * 0.75 * px(count.fontSize) + (words.display === "none" ? 0 : px(style(".dig-chip-of").marginLeft) + 3 * 0.75 * px(style(".dig-chip-of").fontSize)) + px(style(".dig-bar").gap);
+      const titleRoom = roomWidth - 180 - chipWidth - 48 - guideWidth - pickerWidth;
       const ems = EMS[title];
       if (ems === undefined) throw new Error(`No width for ${title}`);
-      expect(style(".dig-title-words").fontSize).toBe("min(40px, (100cqi - 66px) / (var(--letters) * 0.75))");
+      expect(style(".dig-title-words").fontSize).toBe("min(34px, (100cqi - 60px) / (var(--letters) * 0.75))");
       expect(ems).toBeLessThanOrEqual(title.length * 0.75);
-      const size = Math.min(40, (titleRoom - 66) / (title.length * 0.75));
+      const size = Math.min(34, (titleRoom - 60) / (title.length * 0.75));
       expect([style(".dig-title").whiteSpace, size >= 30]).toEqual(["nowrap", true]);
-      expect(66 + ems * size).toBeLessThanOrEqual(titleRoom);
+      expect(60 + ems * size).toBeLessThanOrEqual(titleRoom);
     }
   });
 });

@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import type { AgeLevel, AgeLevelSetting } from "./ageLevel.ts";
 import { beatBest } from "./bestScore.ts";
+import type { QuestionType } from "./compareQuestionLayout.ts";
+import type { ResultType } from "./compareResultLayout.ts";
 import type { Language } from "./language/language.ts";
 import { LevelResultScreen } from "./LevelResultScreen.tsx";
 import { LoadAhead } from "./Picture.tsx";
@@ -33,6 +35,9 @@ const OFFERED = ["hatchling", "explorer", "paleontologist"] as const;
 type Kept = { progress: QuizProgress | undefined; levelChoice: LevelChoice | undefined };
 
 type QuizScreen = { kind: "question"; play: Play } | { kind: "result"; result: RoundResult };
+
+// The screen the quiz shows, each with layouts of its own.
+export type QuizPhase = QuizScreen["kind"];
 
 // A round started, even over one left on HOME and still kept, or its
 // result, is the plain screen change. A new question animates only its
@@ -112,7 +117,9 @@ export function useQuizGame({ dinosaurs, progress, bodyPicture, random }: QuizGa
     go({ kind: "result", result });
   };
 
-  const content = (language: Language) => {
+  // `type` is the question's upright type in the window, and `resultType`
+  // the result's upright sizes.
+  const content = (language: Language, type: QuestionType, resultType: ResultType) => {
     switch (screen?.kind) {
       case undefined:
         return null;
@@ -126,10 +133,11 @@ export function useQuizGame({ dinosaurs, progress, bodyPicture, random }: QuizGa
             {coming && <LoadAhead urls={[bodyPicture(coming.left.id), bodyPicture(coming.right.id)]} />}
             <QuestionScreen
               language={language}
-              {...presentQuestion(question, language, bodyPicture)}
+              {...presentQuestion(question, language, bodyPicture, kept.progress === undefined ? undefined : bestForLevel(kept.progress, current.level) ?? undefined)}
               onChoose={answer}
               onNext={question.last ? () => seeResult(current) : () => goOn(current)}
               onHome={onHome}
+              type={type}
             />
           </>
         );
@@ -137,6 +145,7 @@ export function useQuizGame({ dinosaurs, progress, bodyPicture, random }: QuizGa
       case "result":
         return (
           <LevelResultScreen
+            presentation="dig-site"
             language={language}
             {...presentResult(screen.result)}
             hero={bodyPicture(HERO)}
@@ -144,10 +153,13 @@ export function useQuizGame({ dinosaurs, progress, bodyPicture, random }: QuizGa
             onLevel={chooseLevel}
             onPlayAgain={() => start()}
             onHome={onHome}
+            type={resultType}
           />
         );
     }
   };
 
-  return { start, content, best: kept.progress === undefined ? undefined : bestForLevel(kept.progress, level) ?? undefined };
+  const phase: QuizPhase | undefined = screen?.kind;
+
+  return { start, content, phase, best: kept.progress === undefined ? undefined : bestForLevel(kept.progress, level) ?? undefined };
 }

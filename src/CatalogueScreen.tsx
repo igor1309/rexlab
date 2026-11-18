@@ -9,7 +9,7 @@ import { TEXTS } from "./language/texts.ts";
 import { Picture } from "./Picture.tsx";
 import { SharedPicture, type PictureTransition } from "./SharedPicture.tsx";
 import { useKeptList } from "./useKeptList.ts";
-import type { LayoutKeeping } from "./useKeptRow.ts";
+import type { LayoutKeeping } from "./layoutKeeping.ts";
 
 // How a creature's size is measured: a dinosaur's height, a flying
 // reptile's wingspan or a sea reptile's length.
@@ -84,12 +84,10 @@ export function CatalogueScreen({ ref, pictureTransition, language, dinosaurs, f
 
   return (
     <main ref={main} className="catalogue" aria-label={text.catalogue}>
-      {/* HOME and the chips in one row, or in a tall window the chips
-          on a row of their own under HOME, and the cards under them. */}
       <header className="catalogue-bar">
-        <Button className="home-button" data-turn-part="catalogue-home" onClick={onHome}>
+        <Button className="home-button" aria-label={text.home} data-turn-part="catalogue-home" onClick={onHome}>
           <House size={24} aria-hidden="true" />
-          {text.home}
+          <span className="catalogue-home-word">{text.home}</span>
         </Button>
         <FoodChips language={language} choices={foods} chosen={food} arrangement={chips} widths={chipWidths} onContents={onChipContents} onChoose={onFood} />
       </header>

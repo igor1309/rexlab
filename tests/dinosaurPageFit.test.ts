@@ -1,21 +1,21 @@
 import { describe, expect, it } from "vitest";
 import records from "../src/data/dinosaurs.json";
 import { readCatalogue } from "../src/dinosaurs.ts";
-import { dinosaurWordsWidth, keptLines } from "../src/dinosaurPageLayout.ts";
+import { dinosaurWordsWidth, keptLines, NARROW_PAGE } from "../src/dinosaurPageLayout.ts";
 import { TEXTS } from "../src/language/texts.ts";
 import { formatLength, formatMass } from "../src/formatValue.ts";
 import { NAME_EMS } from "./nameWidths.ts";
 
-// Advances at 28 px, weight 500: Lexend for Latin and the system face for
-// Cyrillic, rounded up to 0.01 em; the space reserves 0.3 em.
+// Advances at 28 px, weight 500: Lexend for Latin and at least Manrope's
+// for Cyrillic, rounded up to 0.01 em; the space reserves 0.3 em.
 const DESCRIPTION_EMS: Record<string, number> = {
   " ": 0.3, A: 0.7, B: 0.69, C: 0.69, D: 0.76, E: 0.63, F: 0.61, G: 0.78, H: 0.77, I: 0.51, J: 0.61, K: 0.74, L: 0.61, M: 0.87, N: 0.8, O: 0.8, P: 0.65, Q: 0.8, R: 0.7, S: 0.63, T: 0.64, U: 0.75, V: 0.72, W: 1, X: 0.7, Y: 0.68, Z: 0.67,
-  О: 0.77, Г: 0.55, Р: 0.62, М: 0.87, Н: 0.74, Ы: 0.86, Й: 0.73, Х: 0.68, Т: 0.62, И: 0.73, К: 0.66, С: 0.72, Б: 0.64, Л: 0.72, Ь: 0.63, Ш: 0.96, В: 0.64, Е: 0.59, Ч: 0.7, А: 0.68, П: 0.73, З: 0.62, У: 0.63, Д: 0.78, Я: 0.66, Ж: 0.99, Ю: 1, Э: 0.72, Ц: 0.78, Ё: 0.59, Щ: 1, Ф: 0.83, "«": 0.52, "»": 0.52, "—": 0.9,
+  О: 0.77, Г: 0.55, Р: 0.62, М: 0.87, Н: 0.74, Ы: 0.86, Й: 0.73, Х: 0.68, Т: 0.62, И: 0.73, К: 0.66, С: 0.73, Б: 0.64, Л: 0.72, Ь: 0.63, Ш: 0.96, В: 0.64, Е: 0.59, Ч: 0.7, А: 0.68, П: 0.73, З: 0.62, У: 0.63, Д: 0.78, Я: 0.66, Ж: 0.99, Ю: 1, Э: 0.72, Ц: 0.78, Ё: 0.59, Щ: 1, Ф: 0.83, "«": 0.52, "»": 0.52, "—": 0.9,
   ".": 0.24, ",": 0.28, "-": 0.42, "'": 0.23, ":": 0.24, "!": 0.27, "2": 0.55, "7": 0.55
 };
 
 // At 13 px, weight 400: Latin advances from the shipped Lexend font and
-// Cyrillic from the macOS system face through CoreText, rounded up to 0.01 em.
+// Cyrillic at least Manrope's, rounded up to 0.01 em.
 // Spaces use the larger Lexend advance, even between Cyrillic words.
 const NOTE_EMS: Record<string, number> = {
   " ": 0.29,
@@ -64,9 +64,9 @@ const NOTE_EMS: Record<string, number> = {
   "Ф": 0.83,
   "а": 0.56,
   "в": 0.55,
-  "г": 0.46,
+  "г": 0.47,
   "д": 0.61,
-  "е": 0.58,
+  "е": 0.59,
   "з": 0.53,
   "и": 0.6,
   "й": 0.6,
@@ -78,19 +78,18 @@ const NOTE_EMS: Record<string, number> = {
   "п": 0.59,
   "р": 0.62,
   "с": 0.57,
-  "т": 0.5,
+  "т": 0.51,
   "у": 0.55,
   "ф": 0.74,
   "ц": 0.62,
   "ы": 0.73,
-  "ь": 0.52,
+  "ь": 0.54,
   "э": 0.57,
-  "я": 0.53
+  "я": 0.56
 };
 
 // At weight 700, rounded up: the shipped Lexend advances for digits and
-// Latin units, and the system face's bold Cyrillic units with 10% room
-// for the iPad's face. The space reserves the wider Lexend advance.
+// Latin units, and Cyrillic units at least Manrope's. The space reserves the wider Lexend advance.
 const FACT_EMS: Record<string, number> = {
   "0": 0.68, "1": 0.57, "2": 0.55, "3": 0.6, "4": 0.67,
   "5": 0.6, "6": 0.58, "7": 0.56, "8": 0.6, "9": 0.58,
@@ -179,5 +178,97 @@ describe("portrait dinosaur words fit the kept bands", () => {
       for (const language of ["en", "ru"] as const) expect(lineCount(TEXTS[language].sourceNote, width, 13, NOTE_EMS)).toBeLessThanOrEqual(3);
     }
     expect(lineCount(TEXTS.ru.sourceNote, 520, 13, NOTE_EMS)).toBe(4);
+  });
+});
+
+// Each fact label's width in ems at weight 600, rounded up: in Lexend
+// for the English labels, and at least Manrope's, which Lexend has no
+// Cyrillic for, for the Russian.
+const LABEL_EMS: Record<string, number> = {
+  TALL: 2.54, WINGS: 3.74, LONG: 2.99, HEAVY: 3.5,
+  РОСТ: 2.71, КРЫЛЬЯ: 4.12, ДЛИНА: 3.59, ВЕС: 1.93
+};
+
+// The words' width in every tall-narrow window, 320 to 599 wide, on its
+// 20-pixel sides.
+const NARROW_WIDTHS = Array.from({ length: 280 }, (_, step) => dinosaurWordsWidth(320 + step, 0, 0, 0, NARROW_PAGE.sidePadding));
+
+describe("narrow dinosaur words fit their kept bands", () => {
+  it("fits all 52 English and Russian descriptions in 24-pixel type, and both notes, at every narrow width", () => {
+    expect([NARROW_WIDTHS[0], NARROW_WIDTHS.at(-1)]).toEqual([280, 559]);
+    for (const width of NARROW_WIDTHS) {
+      const kept = keptLines(width, true);
+      for (const language of ["en", "ru"] as const) {
+        for (const dinosaur of catalogue) {
+          expect(lineCount(dinosaur.description[language], width, NARROW_PAGE.descriptionSize, DESCRIPTION_EMS), `${dinosaur.id} ${language} at ${width}`).toBeLessThanOrEqual(kept.description);
+        }
+        expect(lineCount(TEXTS[language].sourceNote, width, 13, NOTE_EMS), `${language} at ${width}`).toBeLessThanOrEqual(kept.note);
+      }
+    }
+  });
+
+  it("keeps no more lines than the longest takes at the narrowest width of each band", () => {
+    const most = (width: number) => Math.max(...catalogue.flatMap((dinosaur) => (["en", "ru"] as const).map((language) => lineCount(dinosaur.description[language], width, NARROW_PAGE.descriptionSize, DESCRIPTION_EMS))));
+    expect([280, 295, 311, 357, 429].map((width) => [keptLines(width, true).description, most(width)])).toEqual([[8, 8], [7, 7], [6, 6], [5, 5], [4, 4]]);
+  });
+
+  it.each(NARROW_WIDTHS.filter((width) => width % 20 === 0 || width === 280 || width === 335))("fits every name, and each fact's label and value with the facts one over the other, at %i pixels", (width) => {
+    // A fact as wide as the words has 24-pixel side padding; its value is
+    // 26% of the content width, at most 44 pixels, and its label a
+    // 22-pixel symbol 8 from the word.
+    const content = width - 48;
+    const size = Math.min(44, content * 0.26);
+    for (const language of ["en", "ru"] as const) {
+      const texts = TEXTS[language];
+      for (const label of [...Object.values(texts.measures), texts.heavy]) expect(22 + 8 + LABEL_EMS[label]! * 18, label).toBeLessThanOrEqual(content);
+      for (const dinosaur of catalogue) {
+        const name = dinosaur.name[language].toLocaleUpperCase(language);
+        expect(NAME_EMS[name]! * Math.min(64, width * 0.078), name).toBeLessThanOrEqual(width);
+        for (const value of [formatLength(dinosaur.size.metres, language), formatMass(dinosaur.mass, language)]) {
+          expect(emWidth(value, FACT_EMS) * size, `${dinosaur.id} ${language}: ${value}`).toBeLessThanOrEqual(content);
+        }
+      }
+    }
+  });
+});
+
+// The words' side in every wide-short window, an iPhone on its side: 568
+// to 932 wide with no notch, and from 812, the narrowest iPhone with one,
+// with its 59 on each side; half of what the page's 20-pixel sides and
+// the 20-pixel gap beside the stage leave.
+const shortWords = (width: number, inset: number) => (width - 2 * inset - 40 - 20) / 2;
+const SHORT_WIDTHS = [...new Set([
+  ...Array.from({ length: 365 }, (_, step) => shortWords(568 + step, 0)),
+  ...Array.from({ length: 121 }, (_, step) => shortWords(812 + step, 59))
+])].sort((a, b) => a - b);
+
+describe("dinosaur words beside the stage on a phone on its side", () => {
+  it("fits every word of all 52 English and Russian descriptions in 17-pixel type at every width", () => {
+    for (const width of SHORT_WIDTHS) {
+      for (const dinosaur of catalogue) {
+        for (const language of ["en", "ru"] as const) lineCount(dinosaur.description[language], width, 17, DESCRIPTION_EMS);
+      }
+    }
+  });
+
+  it("fits every name, and each fact's label and value with the two facts side by side, at every width", () => {
+    // Two facts share an 8-pixel gap, each with 12-pixel side padding; a
+    // value is 26% of that content, at most 24 pixels, and a label a
+    // 22-pixel symbol 8 from its 14-pixel word.
+    for (const width of SHORT_WIDTHS) {
+      const content = (width - 8) / 2 - 24;
+      const size = Math.min(24, content * 0.26);
+      for (const language of ["en", "ru"] as const) {
+        const texts = TEXTS[language];
+        for (const label of [...Object.values(texts.measures), texts.heavy]) expect(22 + 8 + LABEL_EMS[label]! * 14, `${label} at ${width}`).toBeLessThanOrEqual(content);
+        for (const dinosaur of catalogue) {
+          const name = dinosaur.name[language].toLocaleUpperCase(language);
+          expect(NAME_EMS[name]! * Math.min(32, width * 0.078), `${name} at ${width}`).toBeLessThanOrEqual(width);
+          for (const value of [formatLength(dinosaur.size.metres, language), formatMass(dinosaur.mass, language)]) {
+            expect(emWidth(value, FACT_EMS) * size, `${dinosaur.id} ${language}: ${value} at ${width}`).toBeLessThanOrEqual(content);
+          }
+        }
+      }
+    }
   });
 });

@@ -1,3 +1,4 @@
+import { emptyLabyrinth } from "./support.ts";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App, type AppProps } from "../src/App.tsx";
@@ -25,6 +26,7 @@ import {
   manualPictures,
   manualVisibility,
   memoryStorage,
+  part,
   pageAtRest,
   unreadVersion,
   type ManualViewport,
@@ -36,11 +38,20 @@ import {
 import type { Place, Skeleton } from "../src/skeletons/index.ts";
 import { SILENT, type SkeletonSounds } from "../src/skeletonSounds.ts";
 import type { Theme } from "../src/theme.ts";
+import { appStylesheet, NO_SAFE_AREA } from "./stylesheet.ts";
+
+// The skeleton screens bring their own sheets, as they do in the app.
+if (typeof document !== "undefined") {
+  const skeletonSheets = document.createElement("style");
+  skeletonSheets.textContent = appStylesheet(NO_SAFE_AREA, ["skeletonSite.css", "skeletonChoice.css", "skeletonPuzzle.css", "skeletonGuess.css", "skeletonMuseum.css", "skeletonResult.css"]);
+  document.head.append(skeletonSheets);
+}
 
 export type SkeletonsAppOptions = {
   // Where progress, the language and the theme are kept: one storage, as
   // in a browser.
   storage?: MemoryStorage;
+  homeMotion?: AppProps["homeMotion"];
   pictures?: ManualPictures;
   viewport?: ManualViewport;
   portraitLayouts?: AppProps["portraitLayouts"];
@@ -52,6 +63,7 @@ export type SkeletonsAppOptions = {
   appearance?: Theme;
   // Told each game whose start the app counts.
   startCounter?: AppProps["startCounter"];
+  newHomeGames?: AppProps["newHomeGames"];
   // Where the parent's age level is kept, apart from progress, so a test
   // that blocks progress still has the level it gives; none picked by
   // default.
@@ -79,6 +91,8 @@ export function openHomeApp({
   reducedMotion = false,
   appearance = "light",
   startCounter,
+  newHomeGames,
+  homeMotion,
   ageLevels = memoryStorage(),
   skeletons = SHIPPED_SKELETONS,
   loadHome = true,
@@ -86,6 +100,7 @@ export function openHomeApp({
   skeletonSounds = SILENT
 }: SkeletonsAppOptions = {}) {
   const props: AppProps = {
+    ...emptyLabyrinth(),
     portraitLayouts,
     dinosaurs: SHIPPED_DINOSAURS,
     catalogue: SHIPPED_CATALOGUE,
@@ -112,15 +127,17 @@ export function openHomeApp({
     skeletonPicture: fakeSkeletonPicture,
     ...emptyDig(),
     ...pageAtRest(),
+    ...(homeMotion && { homeMotion }),
     skeletonProgress: localSkeletonProgress(() => storage),
     reducedMotion: () => reducedMotion,
     ...featuring(),
     ...(startCounter && { startCounter }),
+    ...(newHomeGames && { newHomeGames }),
     ...pictures
   };
-  const view = render(<App {...props} />);
+  const view = render(<App {...emptyLabyrinth()} {...props} />);
   if (loadHome) loadShownPictures(pictures);
-  return { user: userEvent.setup(), storage, pictures, viewport, visibility, ageLevels, unmount: view.unmount };
+  return { user: userEvent.setup({ delay: null }), storage, pictures, viewport, visibility, ageLevels, unmount: view.unmount };
 }
 
 // The age level a parent picked as Hatchling, whose puzzle of four pieces
@@ -132,7 +149,7 @@ export const hatchlingLevel = () => memoryStorage({ [AGE_LEVEL_KEY]: JSON.string
 // Hatchling unless the test gives its own age level.
 export function openSkeletonsApp(options: SkeletonsAppOptions = {}) {
   const opened = openHomeApp({ ageLevels: hatchlingLevel(), ...options });
-  fireEvent.click(screen.getByRole("button", { name: shownTexts().skeletons }));
+  fireEvent.click(part('.skeletons-tile, .featured-card[data-game="skeletons"]'));
   return opened;
 }
 
@@ -151,11 +168,14 @@ export const shownTexts = () => {
   return TEXTS[isLanguage(lang) ? lang : "en"];
 };
 
-export const choices = (name = shownTexts().creatures) => within(screen.getByRole("group", { name })).getAllByRole("button");
+// The choice of creatures, the board and the tray, by their class, or by
+// their role and `name` where a test gives one.
+export const choices = (name?: string) =>
+  name === undefined ? [...part(".skeleton-choices").querySelectorAll<HTMLElement>("button")] : within(screen.getByRole("group", { name })).getAllByRole("button");
 
-export const board = (name = shownTexts().skeleton) => screen.getByRole("group", { name });
+export const board = (name?: string) => (name === undefined ? part(".skeleton-board") : screen.getByRole("group", { name }));
 
-export const tray = (name = shownTexts().bones) => screen.getByRole("group", { name });
+export const tray = (name?: string) => (name === undefined ? part(".skeleton-tray") : screen.getByRole("group", { name }));
 
 // Each slot on the outline, by its piece, and whether it is fitted.
 export const slots = () => [...board().querySelectorAll(".skeleton-slot")].map((slot) => [slot.getAttribute("data-piece"), slot.getAttribute("data-state")]);

@@ -1,3 +1,4 @@
+import { emptyLabyrinth } from "./support.ts";
 import { render, screen, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -5,7 +6,6 @@ import { App } from "../src/App.tsx";
 import { PROGRESS_KEY, localProgress } from "../src/localProgress.ts";
 import { correctOf } from "../src/quiz/round.ts";
 import {
-  PALETTE,
   SHIPPED_CATALOGUE,
   SHIPPED_DINOSAURS,
   emptyCare,
@@ -21,7 +21,6 @@ import {
   manualViewport,
   memoryStorage,
   pageAtRest,
-  sameColour,
   seededRandom,
   symbolOf,
   type MemoryStorage,
@@ -56,7 +55,7 @@ const HATCHLING = { load: () => ({ level: "hatchling" as const, revision: null }
 
 function openApp(storage: MemoryStorage, seed = 21) {
   render(
-    <App
+    <App {...emptyLabyrinth()}
       {...featuring()}
       dinosaurs={SHIPPED_DINOSAURS}
       catalogue={SHIPPED_CATALOGUE}
@@ -77,7 +76,7 @@ function openApp(storage: MemoryStorage, seed = 21) {
       {...loadedPictures()}
     />
   );
-  return userEvent.setup();
+  return userEvent.setup({ delay: null });
 }
 
 // Starts a round and answers its first `count` questions, the first
@@ -112,7 +111,7 @@ const shownBest = () => screen.queryByLabelText("BEST SCORE")?.querySelector(".b
 // The best a new best beat, shown before it with an arrow pointing on.
 const shownBeaten = () => {
   const best = screen.queryByLabelText("BEST SCORE");
-  return best && [best.querySelector(".best-score-beaten")?.textContent, symbolOf(best)];
+  return best && [best.querySelector(".best-score-beaten")?.textContent, best.querySelector(".lucide-arrow-right") ? "arrow-right" : undefined];
 };
 
 describe("the result", () => {
@@ -124,11 +123,9 @@ describe("the result", () => {
     await user.click(screen.getByRole("button", { name: "SEE RESULT" }));
 
     expect(score()).toBe("7/10");
-    // One star per question, those scored in amber.
     const stars = [...screen.getByRole("img", { name: "7 OF 10 STARS" }).children];
-    expect(stars.map((star) => sameColour(getComputedStyle(star).color, PALETTE.light.amber ?? ""))).toEqual([
-      ...Array<boolean>(7).fill(true),
-      ...Array<boolean>(3).fill(false)
+    expect(stars.map(star => star.classList.contains("star-won"))).toEqual([
+      ...Array<boolean>(7).fill(true), ...Array<boolean>(3).fill(false)
     ]);
     expect(shownBest()).toBe("9");
     expect(shownBeaten()).toEqual([undefined, undefined]);

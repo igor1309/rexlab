@@ -1,3 +1,4 @@
+import "./careSheets.ts";
 import { act, render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
@@ -15,7 +16,7 @@ import { SkeletonMuseumScreen } from "../src/SkeletonMuseumScreen.tsx";
 import { VisitScreen } from "../src/VisitScreen.tsx";
 import { shipped } from "./careApp.tsx";
 import { withManualPictures } from "./pictures.tsx";
-import { SHIPPED_PALS, SHIPPED_SKELETONS, fakeBodyPicture, fakeItemPicture, fakeSkeletonPicture, manualPictures } from "./support.ts";
+import { SHIPPED_PALS, SHIPPED_SKELETONS, fakeBodyPicture, fakeItemPicture, fakeSkeletonPicture, keptNothing, manualPictures } from "./support.ts";
 
 // dinosaur-care-pictures.feature, find-the-pair-pictures.feature and
 // skeleton-assembly-pictures.feature: every picture of each screen of
@@ -34,7 +35,7 @@ const SCREENS: Array<[screen: string, element: ReactElement, places: string[]]> 
   [
     "the care welcome screen, the visitor at the door and a friend's face",
     <CareWelcomeScreen language="en" best={undefined} total={8} visitorPicture={fakeBodyPicture("brachiosaurus")} friendCount={1} friendPictures={[TRIKE.picture]} onNewVisitor={none} onFriends={none} onHome={none} />,
-    ["new-visitor-picture", "friend-face-picture"]
+    ["new-visitor-picture", "care-face-picture"]
   ],
   ["a visit, its visitor, its bubble's bowl and every item button", <VisitScreen language="en" visit={presentVisit(visit, false, "en", fakeBodyPicture)} itemPicture={fakeItemPicture} onGive={none} onHome={none} />, ["visitor-picture", "bubble-picture", ...Array<string>(5).fill("tray-picture")]],
   ["a visit, as the item given flies", <VisitScreen language="en" visit={presentVisit(give(visit, "meat"), false, "en", fakeBodyPicture)} itemPicture={fakeItemPicture} onGive={none} onHome={none} />, ["visitor-picture", "given-picture", ...Array<string>(5).fill("tray-picture")]],
@@ -43,8 +44,8 @@ const SCREENS: Array<[screen: string, element: ReactElement, places: string[]]> 
     <CareResultScreen language="en" visitor={{ name: T_REX.name.en, picture: fakeBodyPicture(T_REX.id) }} score={8} total={8} best={8} beaten={undefined} celebration={null} newFriend onNewVisitor={none} onFriends={none} onHome={none} />,
     ["result-hero"]
   ],
-  ["my friends", <FriendsScreen language="en" friends={[TRIKE]} nestPicture={fakeItemPicture("nest")} onFriend={none} onNewVisitor={none} onBack={none} onHome={none} />, ["friend-picture"]],
-  ["my friends, with no friend yet", <FriendsScreen language="en" friends={[]} nestPicture={fakeItemPicture("nest")} onFriend={none} onNewVisitor={none} onBack={none} onHome={none} />, ["no-friends-nest"]],
+  ["my friends", <FriendsScreen language="en" friends={[TRIKE]} nestPicture={fakeItemPicture("nest")} onFriend={none} onNewVisitor={none} onBack={none} onHome={none} layoutKeeping={keptNothing} columns={() => 4} />, ["friend-picture"]],
+  ["my friends, with no friend yet", <FriendsScreen language="en" friends={[]} nestPicture={fakeItemPicture("nest")} onFriend={none} onNewVisitor={none} onBack={none} onHome={none} layoutKeeping={keptNothing} columns={() => 4} />, ["no-friends-nest"]],
   ["the find-the-pair welcome screen, its card and silhouette", <PairsWelcomeScreen language="en" level="hatchling" climbLevel={1} stars={0} heroPicture={fakeBodyPicture("triceratops")} onLevel={none} onPlay={none} onHome={none} />, ["pairs-hero-picture", "pairs-hero-picture"]],
   ["a board, two cards turned over", <PairsBoardScreen language="en" {...presentPairsBoard(board, "en", fakeBodyPicture, fakeSkeletonPicture)} finished={false} onTurn={none} onBack={none} onHome={none} />, ["pair-card-picture", "pair-card-picture"]],
   [

@@ -7,7 +7,9 @@ import { TEXTS } from "./language/texts.ts";
 import { Picture, PictureImage, usePicture } from "./Picture.tsx";
 import { LevelBadge, type ShownBadge } from "./LevelBadge.tsx";
 import { CelebrationChip, type Celebration } from "./ResultParts.tsx";
+import { DigGround } from "./DigBar.tsx";
 import { SkeletonBar } from "./SkeletonBar.tsx";
+import "./skeletonResult.css";
 
 export type SkeletonResultScreenProps = {
   language: Language;
@@ -66,9 +68,9 @@ export function SkeletonResultScreen({
   const bodyLook = usePicture(body);
   const bodyShown = bodyLook === "appearing" || bodyLook === "shown";
   return (
-    <main className="skeleton-screen skeleton-result">
+    <main className="skeleton-screen skeleton-dig skeleton-result">
       {celebration && <Festivity />}
-      <div className="stratum stratum-1" aria-hidden="true" />
+      <DigGround />
       <SkeletonBar language={language} title={shownName} onHome={onHome}>
         <p className="skeleton-chip skeleton-stars" aria-label={text.starsEarned}>
           <Star size={20} aria-hidden="true" />
@@ -78,6 +80,7 @@ export function SkeletonResultScreen({
       <div className="skeleton-reveal">
         <div
           className="skeleton-board skeleton-reveal-board"
+          data-turn-part="skeleton-result-board"
           role="img"
           aria-label={shownName}
           style={{ "--frame-width": frame.width, "--frame-height": frame.height } as CSSProperties}
@@ -87,7 +90,7 @@ export function SkeletonResultScreen({
           </span>
           {bodyShown && <PictureImage look={bodyLook} className="skeleton-reveal-body" src={body} alt="" />}
         </div>
-        <section className="skeleton-reward">
+        <section className="skeleton-reward" data-turn-part="skeleton-reward">
           <div className="skeleton-reward-row">
             <span className="skeleton-star" role="img" aria-label={text.star} data-new={newStar || undefined}>
               <Star size={40} aria-hidden="true" />

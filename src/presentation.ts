@@ -3,7 +3,7 @@ import type { CareCelebration as ShownCareCelebration, CareResultScreenProps } f
 import type { CatalogueEntry, Diet, Group, Measure } from "./catalogue.ts";
 import type { CatalogueCardView, Measure as ShownMeasure } from "./CatalogueScreen.tsx";
 import type { Diet as ShownDiet } from "./DietTag.tsx";
-import { asking, clearCells, FRAME, GRID, roundShare, TREASURE_CELLS, type DigRound, type TreasureKind } from "./dig/index.ts";
+import { asking, choiceOpacity, clearCells, FRAME, GRID, roundShare, TREASURE_CELLS, type DigRound, type TreasureKind } from "./dig/index.ts";
 import type { DigBoardScreenProps } from "./DigBoardScreen.tsx";
 import type { DinosaurPageView } from "./DinosaurPage.tsx";
 import { formatLength, formatMass } from "./formatValue.ts";
@@ -12,7 +12,7 @@ import { CLIMB_LEVELS, shapeOf, type Board, type Celebration as PairsCelebration
 import type { PairCardView, PairsBoardScreenProps } from "./PairsBoardScreen.tsx";
 import type { PairsCelebration as ShownPairsCelebration, PairsResultScreenProps } from "./PairsResultScreen.tsx";
 import { bestForLevel as bestForQuizLevel, type Attribute, type Celebration, type Option, type QuestionState, type RoundResult } from "./quiz/index.ts";
-import type { DinosaurCardView, Prompt, QuestionScreenProps } from "./QuestionScreen.tsx";
+import type { DinosaurCardView, Prompt, QuestionScreenProps, QuestionStep } from "./QuestionScreen.tsx";
 import type { ResultScreenProps, Celebration as ShownCelebration } from "./ResultScreen.tsx";
 import type { Celebration as ShownSkeletonCelebration } from "./ResultParts.tsx";
 import type { SkeletonChoiceView } from "./SkeletonChoiceScreen.tsx";
@@ -58,9 +58,10 @@ const FORMATS: Record<Attribute, (value: number, language: Language) => string> 
 
 const CELEBRATIONS: Record<Celebration, ShownCelebration> = { "first-best": "first-best", "new-best": "new-best" };
 
-export type QuestionView = Pick<QuestionScreenProps, "prompt" | "number" | "total" | "left" | "right" | "answered" | "last">;
+export type QuestionView = Pick<QuestionScreenProps, "prompt" | "number" | "total" | "steps" | "best" | "left" | "right" | "answered" | "last">;
 
-export function presentQuestion(question: QuestionState, language: Language, bodyPicture: (dinosaurId: string) => string): QuestionView {
+// `best` is the level's best score, undefined when there is none to show.
+export function presentQuestion(question: QuestionState, language: Language, bodyPicture: (dinosaurId: string) => string, best: number | undefined): QuestionView {
   // Once answered, the right answer is marked whichever card was tapped,
   // so a wrong answer still shows the child which one wins.
   const card = ({ dinosaur, value, correct, chosen }: Option): DinosaurCardView => ({
@@ -71,10 +72,21 @@ export function presentQuestion(question: QuestionState, language: Language, bod
     mark: !question.answered ? undefined : correct ? "correct" : chosen ? "wrong" : undefined,
     chosen
   });
+  // Each question's step: its answer once it has one, the question on
+  // screen just answered standing out from the earlier ones it joins.
+  const step = (_: unknown, index: number): QuestionStep => {
+    const answer = question.answers[index];
+    const onScreen = index + 1 === question.number;
+    if (answer === undefined) return onScreen ? "current" : "to-come";
+    if (!answer) return "wrong";
+    return onScreen ? "just-right" : "right";
+  };
   return {
     prompt: PROMPTS[question.kind],
     number: question.number,
     total: question.total,
+    steps: Array.from({ length: question.total }, step),
+    best,
     left: card(question.left),
     right: card(question.right),
     answered: question.answered,
@@ -442,7 +454,7 @@ export function presentSkeletonMuseum({ stands, score, total, best }: Museum, la
   };
 }
 
-type DigBoardView = Pick<DigBoardScreenProps, "picture" | "frame" | "marks" | "clear" | "cleared" | "blown" | "spots" | "treasure" | "asks" | "choices">;
+type DigBoardView = Pick<DigBoardScreenProps, "picture" | "frame" | "marks" | "clear" | "cleared" | "blown" | "spots" | "treasure" | "asks" | "questionShown" | "choicesShown" | "choices">;
 
 // A dig round's board: its dinosaur's picture under the sand, every mark
 // brushed, and which cells are clear, as rows of 0 and 1, as dig.json
@@ -465,14 +477,16 @@ export function presentDigBoard(
       size: TREASURE_CELLS * width
     },
     spots: round.spots.map(({ kind, x, y, r }) => ({ id: kind, x, y, r, found: round.found.includes(kind), helped: round.helped.includes(kind) })),
-    choices: asking(round) || round.blown ? round.choices.map((id) => ({
+    choices: round.choices.map((id) => ({
       id,
       name: dinosaurName(id),
       picture: bodyPicture(id),
       rejected: round.rejected.includes(id),
       correct: round.blown && id === round.dinosaur.id
-    })) : [],
+    })),
     asks: round.choices.length > 0,
+    questionShown: round.choices.length > 0 && (asking(round) || round.blown),
+    choicesShown: choiceOpacity(roundShare(round)),
     picture: bodyPicture(round.dinosaur.id),
     frame: FRAME,
     marks: round.sand.marks,

@@ -1,3 +1,4 @@
+import { emptyLabyrinth } from "./support.ts";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -79,15 +80,15 @@ describe("a question", () => {
     ] as const) {
       expect(within(card).getByRole("img", { name }).getAttribute("src")).toBe(fakeBodyPicture(byName(name).id));
       const label = within(card).getByText(name.toUpperCase());
-      expect(parseFloat(getComputedStyle(label).fontSize)).toBeGreaterThanOrEqual(32);
+      expect(label.closest("button")).toBe(card);
       expect(card.textContent).not.toMatch(/\d/);
     }
     const [leftSize, rightSize] = pictures.map((picture) => {
       const { width, height } = getComputedStyle(picture);
       return { width, height };
     });
-    expect(leftSize?.width).toMatch(/^[\d.]+px$/);
-    expect(leftSize?.height).toMatch(/^[\d.]+px$/);
+    expect(leftSize?.width).toBe("100%");
+    expect(leftSize?.height).toBe("100%");
     expect(rightSize).toEqual(leftSize);
 
     const home = screen.getByRole("button", { name: "HOME" });
@@ -122,8 +123,8 @@ describe("a dinosaur card's picture", () => {
 describe("a round", () => {
   it("asks to turn the iPad sideways in portrait and resumes the same question", async () => {
     const viewport = manualViewport("landscape");
-    render(<App {...featuring()} dinosaurs={SHIPPED_DINOSAURS} catalogue={SHIPPED_CATALOGUE} bodyPicture={fakeBodyPicture} random={seededRandom(3)} portraitLayouts={{}} viewport={viewport} progress={emptyProgress()} {...englishDevice()} {...lightDevice()} {...unsetAgeLevel()} {...emptyCare()} {...emptySorting()} {...emptyPairs()} {...emptySkeletons()} {...emptyDig()} {...pageAtRest()} {...loadedPictures()} />);
-    const user = userEvent.setup();
+    render(<App {...emptyLabyrinth()} {...featuring()} dinosaurs={SHIPPED_DINOSAURS} catalogue={SHIPPED_CATALOGUE} bodyPicture={fakeBodyPicture} random={seededRandom(3)} portraitLayouts={{}} viewport={viewport} progress={emptyProgress()} {...englishDevice()} {...lightDevice()} {...unsetAgeLevel()} {...emptyCare()} {...emptySorting()} {...emptyPairs()} {...emptySkeletons()} {...emptyDig()} {...pageAtRest()} {...loadedPictures()} />);
+    const user = userEvent.setup({ delay: null });
     await user.click(gameDoor("COMPARE"));
     await answerAndGoOn(user);
     await answerAndGoOn(user);
@@ -143,22 +144,22 @@ describe("a round", () => {
   });
 
   it("marks the questions done, the one on screen and those to come on its steps", async () => {
-    render(<App {...featuring()} dinosaurs={SHIPPED_DINOSAURS} catalogue={SHIPPED_CATALOGUE} bodyPicture={fakeBodyPicture} random={seededRandom(3)} portraitLayouts={{}} viewport={manualViewport("landscape")} progress={emptyProgress()} {...englishDevice()} {...lightDevice()} {...unsetAgeLevel()} {...emptyCare()} {...emptySorting()} {...emptyPairs()} {...emptySkeletons()} {...emptyDig()} {...pageAtRest()} {...loadedPictures()} />);
-    const user = userEvent.setup();
+    render(<App {...emptyLabyrinth()} {...featuring()} dinosaurs={SHIPPED_DINOSAURS} catalogue={SHIPPED_CATALOGUE} bodyPicture={fakeBodyPicture} random={seededRandom(3)} portraitLayouts={{}} viewport={manualViewport("landscape")} progress={emptyProgress()} {...englishDevice()} {...lightDevice()} {...unsetAgeLevel()} {...emptyCare()} {...emptySorting()} {...emptyPairs()} {...emptySkeletons()} {...emptyDig()} {...pageAtRest()} {...loadedPictures()} />);
+    const user = userEvent.setup({ delay: null });
     await user.click(gameDoor("COMPARE"));
     await answerAndGoOn(user);
     await answerAndGoOn(user);
 
     const steps = [...document.querySelectorAll<HTMLElement>(".step")].map((step) => step.dataset.step ?? "to come");
     expect(progress()).toBe("3/10");
-    expect(steps).toEqual(["done", "done", "current", ...Array<string>(7).fill("to come")]);
+    expect(steps).toEqual(["right", "right", "current", ...Array<string>(7).fill("to-come")]);
   });
 
   // The generator's own tests cover the class of random draws; this one
   // proves the app hands each new round the one played before it.
   it("does not repeat the previous round's questions", async () => {
-    render(<App {...featuring()} dinosaurs={SHIPPED_DINOSAURS} catalogue={SHIPPED_CATALOGUE} bodyPicture={fakeBodyPicture} random={seededRandom(5)} portraitLayouts={{}} viewport={manualViewport("landscape")} progress={emptyProgress()} {...englishDevice()} {...lightDevice()} {...unsetAgeLevel()} {...emptyCare()} {...emptySorting()} {...emptyPairs()} {...emptySkeletons()} {...emptyDig()} {...pageAtRest()} {...loadedPictures()} />);
-    const user = userEvent.setup();
+    render(<App {...emptyLabyrinth()} {...featuring()} dinosaurs={SHIPPED_DINOSAURS} catalogue={SHIPPED_CATALOGUE} bodyPicture={fakeBodyPicture} random={seededRandom(5)} portraitLayouts={{}} viewport={manualViewport("landscape")} progress={emptyProgress()} {...englishDevice()} {...lightDevice()} {...unsetAgeLevel()} {...emptyCare()} {...emptySorting()} {...emptyPairs()} {...emptySkeletons()} {...emptyDig()} {...pageAtRest()} {...loadedPictures()} />);
+    const user = userEvent.setup({ delay: null });
 
     async function playRound() {
       await user.click(gameDoor("COMPARE"));

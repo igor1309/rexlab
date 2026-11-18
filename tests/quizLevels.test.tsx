@@ -1,3 +1,4 @@
+import { emptyLabyrinth } from "./support.ts";
 import { render, screen, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -45,7 +46,7 @@ const storedQuiz = (storage: MemoryStorage) => storedRecord(storage)?.games["com
 // progress kept in `storage`.
 function openApp(storage: MemoryStorage) {
   const view = render(
-    <App
+    <App {...emptyLabyrinth()}
       {...featuring("sort")}
       dinosaurs={SHIPPED_DINOSAURS}
       catalogue={SHIPPED_CATALOGUE}
@@ -66,7 +67,7 @@ function openApp(storage: MemoryStorage) {
       {...loadedPictures()}
     />
   );
-  return { user: userEvent.setup(), unmount: view.unmount };
+  return { user: userEvent.setup({ delay: null }), unmount: view.unmount };
 }
 
 const button = (name: string) => screen.getByRole("button", { name });
@@ -110,7 +111,7 @@ describe("the compare quiz's levels across the app", () => {
     expect(switchGroup().compareDocumentPosition(button("PLAY AGAIN")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("keeps the result while a level is chosen, then plays it on PLAY AGAIN, from the tile and after reopening", async () => {
+  it("keeps the result while a level is chosen, then plays it on PLAY AGAIN", async () => {
     const storage = recordAt("explorer", { ...EMPTY_ENTRY, explorerBest: 7, roundsPlayed: 2 });
     const app = openApp(storage);
     await app.user.click(gameDoor("COMPARE"));
@@ -121,11 +122,19 @@ describe("the compare quiz's levels across the app", () => {
     expect(storedQuiz(storage)).toEqual({ ...EMPTY_ENTRY, explorerBest: 7, roundsPlayed: 3, levelChoice: { level: "paleontologist", revision: "parent-pick" } });
     await app.user.click(button("PLAY AGAIN"));
     await finishWith(app.user, 2);
-    expect(storedQuiz(storage)).toMatchObject({ explorerBest: 7, paleontologistBest: 2 });
+    expect([chosen(), storedQuiz(storage)]).toEqual([["paleontologist"], expect.objectContaining({ explorerBest: 7, paleontologistBest: 2, roundsPlayed: 4 })]);
+  });
+
+  // The choice saved as the switch saves it, as the test above shows.
+  it("plays a chosen level again from the tile, by way of HOME, and after reopening", async () => {
+    const storage = recordAt("explorer", { ...EMPTY_ENTRY, explorerBest: 7, paleontologistBest: 2, roundsPlayed: 4, levelChoice: { level: "paleontologist", revision: "parent-pick" } });
+    const app = openApp(storage);
+    await app.user.click(gameDoor("COMPARE"));
+    await finishWith(app.user, 1);
     await app.user.click(button("HOME"));
     await app.user.click(gameDoor("COMPARE"));
     await finishWith(app.user, 4);
-    expect([chosen(), storedQuiz(storage)]).toEqual([["paleontologist"], expect.objectContaining({ paleontologistBest: 4, roundsPlayed: 5 })]);
+    expect([chosen(), storedQuiz(storage)]).toEqual([["paleontologist"], expect.objectContaining({ paleontologistBest: 4, roundsPlayed: 6 })]);
     app.unmount();
     const reopened = openApp(storage);
     await reopened.user.click(gameDoor("COMPARE"));
@@ -133,7 +142,7 @@ describe("the compare quiz's levels across the app", () => {
     expect(chosen()).toEqual(["paleontologist"]);
   });
 
-  it("celebrates a level's first best, keeps the other levels' bests, and shows it on the COMPARE tile", async () => {
+  it("celebrates a level's first best, keeps the other levels' bests, and omits the COMPARE tile badge", async () => {
     const storage = recordAt("paleontologist", { ...EMPTY_ENTRY, explorerBest: 6, roundsPlayed: 3 });
     const { user } = openApp(storage);
     await user.click(gameDoor("COMPARE"));
@@ -141,7 +150,7 @@ describe("the compare quiz's levels across the app", () => {
     expect([celebrations(), shownBest()]).toEqual([["FIRST BEST SCORE"], "4"]);
     expect(storedQuiz(storage)).toEqual({ ...EMPTY_ENTRY, explorerBest: 6, paleontologistBest: 4, roundsPlayed: 4 });
     await user.click(button("HOME"));
-    expect(tileBest()).toBe("4");
+    expect(tileBest()).toBeUndefined();
   });
 
   it("reads a best saved before the quiz had levels as Hatchling's", async () => {
@@ -153,7 +162,7 @@ describe("the compare quiz's levels across the app", () => {
     expect(celebrations()).toEqual(["FIRST BEST SCORE"]);
     await user.click(switchButton("hatchling"));
     await user.click(button("HOME"));
-    expect(tileBest()).toBe("8");
+    expect(tileBest()).toBeUndefined();
     expect(storedQuiz(storage)).toEqual({ bestScore: 8, explorerBest: 3, paleontologistBest: null, roundsPlayed: 3, levelChoice: { level: "hatchling", revision: "parent-pick" } });
   });
 
@@ -170,9 +179,11 @@ describe("the compare quiz's levels across the app", () => {
     expect(chosen()).toEqual(["paleontologist"]);
   });
 
-  it.each([undefined, "hatchling"] as const)("holds an unsavable choice for the visit over a saved choice of %s, then reloads the stored level", async (saved) => {
-    const entry = { ...EMPTY_ENTRY, ...(saved && { levelChoice: { level: saved, revision: "parent-pick" } }) };
-    const storage = memoryStorage(Object.fromEntries(recordAt("explorer", entry).items), { save: false });
+  // A storage that saves nothing, holding a saved choice of `saved`.
+  const unsavable = (saved: AgeLevel | undefined) => memoryStorage(Object.fromEntries(recordAt("explorer", { ...EMPTY_ENTRY, ...(saved && { levelChoice: { level: saved, revision: "parent-pick" } }) }).items), { save: false });
+
+  it.each([undefined, "hatchling"] as const)("holds an unsavable choice for the visit over a saved choice of %s, the storage untouched", async (saved) => {
+    const storage = unsavable(saved);
     const before = storage.items.get(PROGRESS_KEY);
     const app = openApp(storage);
     await app.user.click(gameDoor("COMPARE"));
@@ -182,10 +193,27 @@ describe("the compare quiz's levels across the app", () => {
     await app.user.click(gameDoor("COMPARE"));
     await finishWith(app.user, 5);
     expect([chosen(), storage.items.get(PROGRESS_KEY)]).toEqual([["paleontologist"], before]);
+  });
+
+  it.each([undefined, "hatchling"] as const)("reopened after an unsaved choice over a saved choice of %s, plays the stored level", async (saved) => {
+    const storage = unsavable(saved);
+    const app = openApp(storage);
+    await app.user.click(gameDoor("COMPARE"));
+    await finishWith(app.user, 5);
+    await app.user.click(switchButton("paleontologist"));
+    expect(chosen()).toEqual(["paleontologist"]);
     app.unmount();
     const reopened = openApp(storage);
     await reopened.user.click(gameDoor("COMPARE"));
     await finishWith(reopened.user, 5);
     expect(chosen()).toEqual([saved ?? "explorer"]);
   });
+});
+
+// Question composition selects the active level's saved score, including zero.
+it.each(AGE_LEVELS)("shows only %s's saved best on the question", async (level) => {
+  const best = { hatchling: 0, explorer: 6, paleontologist: 9 };
+  const { user } = openApp(recordAt(level, { bestScore: 0, explorerBest: 6, paleontologistBest: 9, roundsPlayed: 3 }));
+  await user.click(gameDoor("COMPARE"));
+  expect(screen.getByLabelText(TEXTS.en.bestScore).textContent).toBe(`${best[level]}/10`);
 });

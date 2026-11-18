@@ -1,3 +1,6 @@
+import { THEMES } from "../src/theme.ts";
+import { gameDoor } from "./support.ts";
+import { emptyLabyrinth } from "./support.ts";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -37,7 +40,7 @@ import {
 function openApp({ language = "en", theme = "light", found = [] }: { language?: Language; theme?: Theme; found?: string[] } = {}) {
   const pairs = memoryStorage({ [PROGRESS_KEY]: pairsRecord({ stars: 0, level: 1, boardsOnLevel: 0, best: {}, found }) });
   render(
-    <App
+    <App {...emptyLabyrinth()}
       {...featuring()}
       dinosaurs={SHIPPED_DINOSAURS}
       catalogue={SHIPPED_CATALOGUE}
@@ -62,7 +65,7 @@ function openApp({ language = "en", theme = "light", found = [] }: { language?: 
       {...pageAtRest()}
     />
   );
-  return userEvent.setup();
+  return userEvent.setup({ delay: null });
 }
 
 type User = ReturnType<typeof userEvent.setup>;
@@ -83,7 +86,7 @@ const symbolsOf = (element: Element) =>
   [...element.querySelectorAll("svg.lucide")].map((svg) => [...svg.classList].find((name) => name.startsWith("lucide-"))?.slice("lucide-".length));
 
 async function openCatalogue(user: User, language: Language = "en") {
-  await user.click(screen.getByRole("button", { name: TEXTS[language].catalogueTile }));
+  await user.click(gameDoor(TEXTS[language].catalogue));
 }
 
 async function choose(user: User, name: string) {
@@ -182,7 +185,7 @@ describe("the catalogue's food chips", () => {
     const last = ofDiet("plants").at(-1)?.name.en ?? "";
     await user.click(within(grid()).getByRole("button", { name: last }));
 
-    await user.click(screen.getByRole("button", { name: "ANCIENT REPTILES" }));
+    await user.click(gameDoor("ANCIENT REPTILES"));
 
     expect(chosen()).toEqual(["PLANTS"]);
     expect(cardNames()).toHaveLength(23);
@@ -204,7 +207,7 @@ describe("the catalogue's food chips", () => {
     const user = openApp();
     await choose(user, "MEAT");
     await user.click(screen.getByRole("button", { name: "Tyrannosaurus" }));
-    await user.click(screen.getByRole("button", { name: "ANCIENT REPTILES" }));
+    await user.click(gameDoor("ANCIENT REPTILES"));
     expect(grid().dataset.rise).toBeUndefined();
     const before = grid();
 
@@ -225,7 +228,7 @@ describe("the catalogue's food chips", () => {
     expect(chips(language).map((each) => each.getAttribute("aria-label"))).toEqual(names);
   });
 
-  it.each(["light", "dark"] as const)("lift the chosen one by a shadow, its outline off, in the %s theme", async (theme) => {
+  it.each(THEMES)("lift the chosen one by a shadow, its outline off, in the %s theme", async (theme) => {
     const user = openApp({ theme });
     await openCatalogue(user);
 

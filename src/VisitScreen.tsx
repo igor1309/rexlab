@@ -1,9 +1,12 @@
 import { Bath, Check, Droplet, Heart, House, Moon, Undo2, Utensils, type LucideIcon } from "lucide-react";
 import type { CSSProperties } from "react";
 import { Button } from "./Button.tsx";
+import { DigGround } from "./DigBar.tsx";
 import type { Language } from "./language/language.ts";
 import { TEXTS, type Texts } from "./language/texts.ts";
 import { Picture } from "./Picture.tsx";
+import "./skeletonSite.css";
+import "./careVisit.css";
 
 export type CareItem = keyof Texts["items"];
 export type CareNeed = keyof Texts["needs"];
@@ -51,11 +54,12 @@ export function VisitScreen({ language, visit, itemPicture, onGive, onHome }: Vi
   // reaction, or once the visitor leaves, gives nothing.
   const busy = need === undefined || reacting !== null;
   return (
-    <main className="visit">
+    <main className="skeleton-dig visit">
+      <DigGround />
       <header className="visit-bar">
         <Button className="home-button" onClick={onHome}>
           <House size={24} aria-hidden="true" />
-          {text.home}
+          <span className="upright-hidden">{text.home}</span>
         </Button>
         <ol className="needs" aria-label={text.needsLabel}>
           {needs.map(({ need: each, state }) => {
@@ -68,14 +72,14 @@ export function VisitScreen({ language, visit, itemPicture, onGive, onHome }: Vi
           })}
         </ol>
         <p className="hearts-counter" aria-label={text.hearts}>
-          <Heart size={28} aria-hidden="true" />
+          <Heart size={22} aria-hidden="true" />
           {/* A new count bumps in as the hearts earned reach it. */}
           <span key={hearts} className="hearts-count">
             {hearts}
           </span>
         </p>
       </header>
-      <section className="stage" data-reaction={reacting?.reaction} data-item={reacting?.item} data-leaving={leaving || undefined}>
+      <section className="stage" data-turn-part="care-stage" data-reaction={reacting?.reaction} data-item={reacting?.item} data-leaving={leaving || undefined}>
         <span className="stage-glow" aria-hidden="true" />
         <span className="stage-ground" aria-hidden="true" />
         <h1 className="visitor-name" aria-label={name}>
@@ -129,7 +133,7 @@ export function VisitScreen({ language, visit, itemPicture, onGive, onHome }: Vi
           </>
         )}
       </section>
-      <div className="tray" role="group" aria-label={text.care} data-busy={busy || undefined}>
+      <div className="tray" data-turn-part="care-tray" role="group" aria-label={text.care} data-busy={busy || undefined}>
         {CARE_ITEMS.map((item) => (
           <TrayItem
             key={item}
